@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		02D7E7C52F6D143A00C20BC2 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = 02D7E7C42F6D143A00C20BC2 /* GoogleSignIn */; };
 		02D7E7C72F6D143A00C20BC2 /* GoogleSignInSwift in Frameworks */ = {isa = PBXBuildFile; productRef = 02D7E7C62F6D143A00C20BC2 /* GoogleSignInSwift */; };
+		8C8E4A012FB7239700E4A100 /* .env in Resources */ = {isa = PBXBuildFile; fileRef = 8C8E4A002FB7239700E4A100 /* .env */; };
 		BF1B1AAF2F4070EF00C4F236 /* VL1004.mlpackage in Sources */ = {isa = PBXBuildFile; fileRef = BF1B1AAE2F4070EF00C4F236 /* VL1004.mlpackage */; };
 		BFDA3C6F2F40735600445EC1 /* FirebaseAI in Frameworks */ = {isa = PBXBuildFile; productRef = BFDA3C6E2F40735600445EC1 /* FirebaseAI */; };
 		BFDA3C712F40735600445EC1 /* FirebaseAILogic in Frameworks */ = {isa = PBXBuildFile; productRef = BFDA3C702F40735600445EC1 /* FirebaseAILogic */; };
@@ -38,6 +39,7 @@
 
 /* Begin PBXFileReference section */
 		02AE994B2ED5711C0079EA2B /* ANSD_APP.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ANSD_APP.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		8C8E4A002FB7239700E4A100 /* .env */ = {isa = PBXFileReference; lastKnownFileType = text; path = ANSD_APP/.env; sourceTree = SOURCE_ROOT; };
 		BF1B1AAE2F4070EF00C4F236 /* VL1004.mlpackage */ = {isa = PBXFileReference; lastKnownFileType = folder.mlpackage; path = VL1004.mlpackage; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -103,6 +105,7 @@
 			isa = PBXGroup;
 			children = (
 				02AE994D2ED5711C0079EA2B /* ANSD_APP */,
+				8C8E4A002FB7239700E4A100 /* .env */,
 				02AE994C2ED5711C0079EA2B /* Products */,
 				BF1B1AAE2F4070EF00C4F236 /* VL1004.mlpackage */,
 				BFDA3C6C2F40729100445EC1 /* Frameworks */,
@@ -220,6 +223,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				8C8E4A012FB7239700E4A100 /* .env in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -43,10 +43,18 @@ class TextCleanupManager {
     // MARK: - Private AI Logic
 
     private func performAIProcessing(text: String, index: Int, completion: @escaping (Int, String) -> Void) async {
-        guard !text.isEmpty, text.count > 3 else { return }
+        guard !text.isEmpty, text.count > 3 else {
+            await MainActor.run {
+                completion(index, text)
+            }
+            return
+        }
 
         guard model.isAvailable else {
-            print("⚠️ [TextCleanup] FoundationModels not available on this device.")
+            print("[TextCleanup] FoundationModels not available on this device. Using original text.")
+            await MainActor.run {
+                completion(index, text)
+            }
             return
         }
 

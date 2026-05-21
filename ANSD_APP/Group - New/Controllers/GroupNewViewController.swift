@@ -40,6 +40,7 @@ class GroupNewViewController: UIViewController, UICollectionViewDelegate, UIColl
         var otherPersonName = "Guest"
         var messages: [GroupNewChatMessage] = []
         var cleanedMessageIndices = Set<Int>()
+        var sentMessageIndices = Set<Int>()
         var currentSessionID: String = ""
 
     // --- FIXED PROPERTY DECLARATIONS ---
@@ -49,7 +50,7 @@ class GroupNewViewController: UIViewController, UICollectionViewDelegate, UIColl
         return rawID.components(separatedBy: CharacterSet(charactersIn: ".#$[]")).joined(separator: "_")
     }
 
-        var myName: String {
+    var myName: String {
         UserDefaults.standard.string(forKey: "user_first_name") ?? UIDevice.current.name
     }
         // -----------------------------------
@@ -230,21 +231,19 @@ class GroupNewViewController: UIViewController, UICollectionViewDelegate, UIColl
                             self.scrollToBottom()
                         }
 
-                        // SILENCE DETECTION
-                        self.cleanupManager.scheduleCleanup(text: "keepalive", at: 0) { _, _ in
-                            Task { @MainActor in
-                                // Finalize whatever is in the last bubble
-                                if let finalIndex = self.messages.lastIndex(where: { !$0.isIncoming }) {
-                                    let finalText = self.messages[finalIndex].text
-                                    if finalText != "Listening..." && finalText != "..." && !finalText.isEmpty {
-                                        // Trigger AI Cleanup for the silenced bubble
-                                        self.processTextWithAppleIntelligence(text: finalText, index: finalIndex)
-                                    }
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in
+                            guard let self = self else { return }
+                            
+                            if let finalIndex = self.messages.lastIndex(where: { !$0.isIncoming }) {
+                                let finalText = self.messages[finalIndex].text
+                                if finalText != "Listening..." && finalText != "..." && !finalText.isEmpty {
+                                    self.processTextWithAppleIntelligence(text: finalText, index: finalIndex)
                                 }
-
-                                // Silence-based restart removed as per request.
-                                // Bubble persists until manual stop or character limit reached.
                             }
+                        }
+                        
+                        if result.isFinal {
+                            self.finalizeCurrentOutgoingMessage()
                         }
                     }
                 }
@@ -265,56 +264,37 @@ class GroupNewViewController: UIViewController, UICollectionViewDelegate, UIColl
     private func processTextWithAppleIntelligence(text: String, index: Int) {
         if cleanedMessageIndices.contains(index) { return }
         cleanedMessageIndices.insert(index)
-
-        Task {
-            do {
-                let instructions = """
-                You are a real-time text cleanup assistant for a live captioning app designed for people with hearing loss. Your sole job is to fix grammar and punctuation in conversational speech-to-text output.
-
-                GUARDRAILS:
-                - Never fabricate, hallucinate, or invent information not present in the input.
-                - Never produce harmful, offensive, biased, or discriminatory content.
-                - If the input is empty, unintelligible, or meaningless, return it as-is without any additional words.
-                - Always respond in the SAME language as the input.
-                - Never include commentary, apologies, disclaimers, or boilerplate text.
-                - Return ONLY the cleaned text with no extra formatting or explanation.
-                """
-                let prompt = """
-                Clean up the following conversational text by fixing grammar and punctuation. Return ONLY the cleaned text.
-
-                Text: "\(text)"
-                """
-                let session = LanguageModelSession(model: model, instructions: instructions)
-                let response = try await session.respond(to: prompt)
-                var cleanedText = response.content.trimmingCharacters(in: .whitespacesAndNewlines)
-
-                // Safety filter: If AI returns a commentary/apology, discard cleanup and use original text
-                let lowercaseResponse = cleanedText.lowercased()
-                if lowercaseResponse.contains("i'm sorry") || lowercaseResponse.contains("as an ai") || lowercaseResponse.contains("can't process") {
-                    cleanedText = text
-                }
-
-                await MainActor.run {
-                    // Update Local UI
-                    if index < self.messages.count {
-                        self.messages[index].text = cleanedText
-                        self.collectionView.reloadItems(at: [IndexPath(item: index, section: 0)])
-
-                        // Send to Firebase
-                        self.firebase.send(text: cleanedText, sender: self.myName, senderID: self.currentUserID)
-                    }
-                }
-            } catch {
-                print("Apple Intelligence Error: \(error)")
-                // Fallback: Send raw text if AI fails
-                await MainActor.run {
-                    self.firebase.send(text: text, sender: self.myName, senderID: self.currentUserID)
-                }
+        
+        cleanupManager.scheduleCleanup(text: text, at: index) { [weak self] cleanedIndex, cleanedText in
+            guard let self = self else { return }
+            
+            if cleanedIndex < self.messages.count {
+                self.messages[cleanedIndex].text = cleanedText
+                self.collectionView.reloadItems(at: [IndexPath(item: cleanedIndex, section: 0)])
             }
+            
+            self.sendMessageIfNeeded(text: cleanedText, index: cleanedIndex)
         }
+    }
+    
+    private func sendMessageIfNeeded(text: String, index: Int) {
+        let trimmedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedText.isEmpty,
+              trimmedText != "Listening...",
+              trimmedText != "...",
+              !sentMessageIndices.contains(index) else { return }
+        
+        sentMessageIndices.insert(index)
+        firebase.send(text: trimmedText, sender: myName, senderID: currentUserID)
+    }
+    
+    private func finalizeCurrentOutgoingMessage() {
+        guard let finalIndex = messages.lastIndex(where: { !$0.isIncoming }) else { return }
+        processTextWithAppleIntelligence(text: messages[finalIndex].text, index: finalIndex)
     }
 
     private func stopRecording() {
+        finalizeCurrentOutgoingMessage()
         audioEngine.stop()
         recognitionRequest?.endAudio()
         audioEngine.inputNode.removeTap(onBus: 0)
