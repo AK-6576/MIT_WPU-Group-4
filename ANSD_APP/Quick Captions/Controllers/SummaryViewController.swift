@@ -249,20 +249,16 @@ class SummaryViewController: UIViewController, UITableViewDelegate, UITableViewD
                 let theRealName = participantsData[realIndex].name
                 let theRealSenderID = participantsData[realIndex].senderID
 
-                for m in 0..<rawMessages.count {
-                    if rawMessages[m].sender == theGhostName {
-                        rawMessages[m].sender = theRealName
-                        rawMessages[m].senderID = theRealSenderID
-                    }
+                for m in 0..<rawMessages.count where rawMessages[m].sender == theGhostName {
+                    rawMessages[m].sender = theRealName
+                    rawMessages[m].senderID = theRealSenderID
                 }
             }
         }
 
         // Filter out ghosts and empty summaries
-        for p in participantsData {
-            if !droppedGhostNames.contains(p.name) {
-                validParticipants.append(p)
-            }
+        for p in participantsData where !droppedGhostNames.contains(p.name) {
+            validParticipants.append(p)
         }
 
         self.participantsData = validParticipants
@@ -370,7 +366,7 @@ class SummaryViewController: UIViewController, UITableViewDelegate, UITableViewD
 
         // MARK: SECTION 0 - Header: "Conversation Summary"
         case 0:
-            let cell = tableView.dequeueReusableCell(withIdentifier: "SummarySectionHeaderCell", for: indexPath) as! QuickCaptionsSummarySectionHeaderCell
+            guard let cell = tableView.dequeueReusableCell(withIdentifier: "SummarySectionHeaderCell", for: indexPath) as? QuickCaptionsSummarySectionHeaderCell else { return UITableViewCell() }
             cell.headerLabel.text = "Conversation Summary"
             cell.headerIcon.image = UIImage(systemName: "list.clipboard")
             cell.selectionStyle = .none
@@ -378,7 +374,7 @@ class SummaryViewController: UIViewController, UITableViewDelegate, UITableViewD
 
         // MARK: SECTION 1 - Card: Date, Time, Location
         case 1:
-            let cell = tableView.dequeueReusableCell(withIdentifier: "SummaryCardCell", for: indexPath) as! QuickCaptionsSummaryCardCell
+            guard let cell = tableView.dequeueReusableCell(withIdentifier: "SummaryCardCell", for: indexPath) as? QuickCaptionsSummaryCardCell else { return UITableViewCell() }
 
             cell.configure(
                 title: self.conversationTitle,
@@ -394,7 +390,7 @@ class SummaryViewController: UIViewController, UITableViewDelegate, UITableViewD
 
         // MARK: SECTION 2 - Header: "Participants Summary"
         case 2:
-            let cell = tableView.dequeueReusableCell(withIdentifier: "SummarySectionHeaderCell", for: indexPath) as! QuickCaptionsSummarySectionHeaderCell
+            guard let cell = tableView.dequeueReusableCell(withIdentifier: "SummarySectionHeaderCell", for: indexPath) as? QuickCaptionsSummarySectionHeaderCell else { return UITableViewCell() }
 
             cell.headerLabel.text = "Participants Summary"
             cell.headerIcon.image = UIImage(systemName: "person.2.fill")
@@ -403,7 +399,7 @@ class SummaryViewController: UIViewController, UITableViewDelegate, UITableViewD
 
         // MARK: SECTION 3 - List: Participant Rows
         case 3:
-            let cell = tableView.dequeueReusableCell(withIdentifier: "ParticipantCardCell", for: indexPath) as! QuickCaptionsParticipantCardCell
+            guard let cell = tableView.dequeueReusableCell(withIdentifier: "ParticipantCardCell", for: indexPath) as? QuickCaptionsParticipantCardCell else { return UITableViewCell() }
             let participant = participantsData[indexPath.row]
 
             cell.configure(with: participant)
@@ -413,7 +409,7 @@ class SummaryViewController: UIViewController, UITableViewDelegate, UITableViewD
 
         // MARK: SECTION 4 - Header: "Notes"
         case 4:
-            let cell = tableView.dequeueReusableCell(withIdentifier: "SummarySectionHeaderCell", for: indexPath) as! QuickCaptionsSummarySectionHeaderCell
+            guard let cell = tableView.dequeueReusableCell(withIdentifier: "SummarySectionHeaderCell", for: indexPath) as? QuickCaptionsSummarySectionHeaderCell else { return UITableViewCell() }
             cell.headerLabel.text = "Notes"
             cell.headerIcon.image = UIImage(systemName: "note.text")
             cell.selectionStyle = .none
@@ -421,7 +417,7 @@ class SummaryViewController: UIViewController, UITableViewDelegate, UITableViewD
 
         // MARK: SECTION 5 - Card: Key Takeaways
         case 5:
-            let cell = tableView.dequeueReusableCell(withIdentifier: "NotesCardCell", for: indexPath) as! QuickCaptionsNotesCardCell
+            guard let cell = tableView.dequeueReusableCell(withIdentifier: "NotesCardCell", for: indexPath) as? QuickCaptionsNotesCardCell else { return UITableViewCell() }
             cell.notesTextView.text = self.notesContent
             cell.delegate = self
             cell.selectionStyle = .none

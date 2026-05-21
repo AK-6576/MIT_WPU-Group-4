@@ -171,10 +171,8 @@ class FirebaseManager {
         // 3. Remove from participant nodes (shared_quick_actions)
         databaseRef.child("shared_quick_actions").observeSingleEvent(of: .value) { snapshot in
             guard let allParticipants = snapshot.value as? [String: [String: Any]] else { return }
-            for (participantName, actions) in allParticipants {
-                if actions[safeCode] != nil {
-                    self.databaseRef.child("shared_quick_actions").child(participantName).child(safeCode).removeValue()
-                }
+            for (participantName, actions) in allParticipants where actions[safeCode] != nil {
+                self.databaseRef.child("shared_quick_actions").child(participantName).child(safeCode).removeValue()
             }
         }
     }

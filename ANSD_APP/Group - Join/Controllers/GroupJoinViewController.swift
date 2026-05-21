@@ -424,14 +424,22 @@ class GroupJoinViewController: UIViewController, UICollectionViewDelegate, UICol
 
     // MARK: - Actions
     @IBAction func micButtonTapped(_ sender: UIButton) {
-        isRecording ? stopRecording() : startRecording()
+        if isRecording {
+            stopRecording()
+        } else {
+            startRecording()
+        }
     }
 
     @IBAction func pauseButtonTapped(_ sender: UIButton) {
         isPaused.toggle()
         let iconName = isPaused ? "play.fill" : "pause.fill"
         GroupJoinPauseButton.setImage(UIImage(systemName: iconName), for: .normal)
-        isPaused ? stopRecording() : startRecording()
+        if isPaused {
+            stopRecording()
+        } else {
+            startRecording()
+        }
     }
 
     @IBAction func endButtonTapped(_ sender: UIButton) {
@@ -495,11 +503,11 @@ class GroupJoinViewController: UIViewController, UICollectionViewDelegate, UICol
     func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
         let message = messages[indexPath.row]
         if message.isIncoming {
-            let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "GroupJoinIncomingCell", for: indexPath) as! GroupJoinIncomingCell
+            guard let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "GroupJoinIncomingCell", for: indexPath) as? GroupJoinIncomingCell else { return UICollectionViewCell() }
             cell.configure(with: message)
             return cell
         } else {
-            let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "GroupJoinOutgoingCell", for: indexPath) as! GroupJoinOutgoingCell
+            guard let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "GroupJoinOutgoingCell", for: indexPath) as? GroupJoinOutgoingCell else { return UICollectionViewCell() }
             cell.configure(with: message)
             return cell
         }

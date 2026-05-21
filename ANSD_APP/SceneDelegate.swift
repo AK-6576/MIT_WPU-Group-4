@@ -20,7 +20,7 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
         // --- Persistence Logic ---
         // Check if a user is already authenticated via Firebase.
-        if let _ = Auth.auth().currentUser {
+        if Auth.auth().currentUser != nil {
             // User is logged in: Navigate directly to the Home screen.
             let storyboard = UIStoryboard(name: "Home", bundle: nil)
             if let homeNav = storyboard.instantiateViewController(withIdentifier: "HomeNav") as? UINavigationController {

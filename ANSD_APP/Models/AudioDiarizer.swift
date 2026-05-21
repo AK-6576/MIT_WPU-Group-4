@@ -247,7 +247,8 @@ class AudioDiarizer: ObservableObject {
             return
         }
 
-        var scoredSpeakers: [(id: Int, score: Float, raw: Float)] = []
+        struct ScoredSpeaker { let id: Int; let score: Float; let raw: Float }
+        var scoredSpeakers: [ScoredSpeaker] = []
         for id in speakerProfiles.keys {
             guard let dynamicProfile = speakerProfiles[id], let anchorProfile = baseAnchors[id] else { continue }
 
@@ -264,7 +265,7 @@ class AudioDiarizer: ObservableObject {
             if id == lastMatchedSpeakerID { score += 0.05 }
 
             score = min(score, 1.0)
-            scoredSpeakers.append((id: id, score: score, raw: raw))
+            scoredSpeakers.append(ScoredSpeaker(id: id, score: score, raw: raw))
         }
 
         scoredSpeakers.sort { $0.score > $1.score }

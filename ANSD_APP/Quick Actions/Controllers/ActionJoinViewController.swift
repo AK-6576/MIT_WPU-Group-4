@@ -546,12 +546,12 @@ class ActionJoinViewController: UIViewController, UICollectionViewDelegate, UICo
         let message = messages[indexPath.row]
 
         if message.isIncoming {
-            let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "IncomingCell", for: indexPath) as! IncomingCell
+            guard let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "IncomingCell", for: indexPath) as? IncomingCell else { return UICollectionViewCell() }
             cell.messageLabel.text = message.text
             cell.nameLabel.text = message.sender
             return cell
         } else {
-            let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "OutgoingCell", for: indexPath) as! OutgoingCell
+            guard let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "OutgoingCell", for: indexPath) as? OutgoingCell else { return UICollectionViewCell() }
             cell.messageLabel.text = message.text
             return cell
         }

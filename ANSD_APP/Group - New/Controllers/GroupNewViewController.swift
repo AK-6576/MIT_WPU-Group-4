@@ -436,7 +436,11 @@ class GroupNewViewController: UIViewController, UICollectionViewDelegate, UIColl
 
     // MARK: - Actions
     @IBAction func micButtonTapped(_ sender: UIButton) {
-        isRecording ? stopRecording() : startRecording()
+        if isRecording {
+            stopRecording()
+        } else {
+            startRecording()
+        }
     }
 
     private func updateMicButtonVisuals(isActive: Bool) {
@@ -448,7 +452,11 @@ class GroupNewViewController: UIViewController, UICollectionViewDelegate, UIColl
         isPaused.toggle()
         let iconName = isPaused ? "play.fill" : "pause.fill"
         pauseButton.setImage(UIImage(systemName: iconName), for: .normal)
-        isPaused ? stopRecording() : startRecording()
+        if isPaused {
+            stopRecording()
+        } else {
+            startRecording()
+        }
     }
 
     @IBAction func endButtonTapped(_ sender: UIButton) {
@@ -514,11 +522,11 @@ class GroupNewViewController: UIViewController, UICollectionViewDelegate, UIColl
     func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
         let message = messages[indexPath.row]
         if message.isIncoming {
-            let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "GroupNewIncomingCell", for: indexPath) as! GroupNewIncomingCell
+            guard let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "GroupNewIncomingCell", for: indexPath) as? GroupNewIncomingCell else { return UICollectionViewCell() }
             cell.configure(with: message)
             return cell
         } else {
-            let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "GroupNewOutgoingCell", for: indexPath) as! GroupNewOutgoingCell
+            guard let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "GroupNewOutgoingCell", for: indexPath) as? GroupNewOutgoingCell else { return UICollectionViewCell() }
             cell.configure(with: message)
             return cell
         }

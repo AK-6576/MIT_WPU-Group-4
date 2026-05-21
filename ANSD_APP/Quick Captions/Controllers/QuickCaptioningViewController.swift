@@ -754,7 +754,7 @@ class QuickCaptioningViewController: UIViewController,
         let isPending = msg.speakerID == -1
 
         if msg.isIncoming {
-            let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "QCIncomingCell", for: indexPath) as! QuickCaptionsIncomingCell
+            guard let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "QCIncomingCell", for: indexPath) as? QuickCaptionsIncomingCell else { return UICollectionViewCell() }
             cell.messageLabel.text = msg.text
             cell.nameLabel.text = msg.sender
             cell.onLabelTapped = { [weak self] in self?.showRenameAlert(for: indexPath.row) }
@@ -763,7 +763,7 @@ class QuickCaptioningViewController: UIViewController,
             cell.setIdentifying(isPending && isLastBubble)
             return cell
         } else {
-            let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "QCOutgoingCell", for: indexPath) as! QuickCaptionsOutgoingCell
+            guard let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "QCOutgoingCell", for: indexPath) as? QuickCaptionsOutgoingCell else { return UICollectionViewCell() }
             cell.QCmessageLabel.text = msg.text
             let isLastBubble = (indexPath.row == messages.count - 1)
             cell.setIdentifying(isPending && isLastBubble)

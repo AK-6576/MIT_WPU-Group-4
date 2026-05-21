@@ -199,7 +199,7 @@ class ParticipantSelectionViewController: UIViewController, UITableViewDelegate,
     }
 
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        let cell = tableView.dequeueReusableCell(withIdentifier: "ContactCell", for: indexPath) as! ContactCell
+        guard let cell = tableView.dequeueReusableCell(withIdentifier: "ContactCell", for: indexPath) as? ContactCell else { return UITableViewCell() }
         let contact = isFiltering ? filteredContacts[indexPath.row] : realContacts[indexPath.row]
         let fullName = "\(contact.givenName) \(contact.familyName)".trimmingCharacters(in: .whitespaces)
 

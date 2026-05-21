@@ -482,10 +482,10 @@ extension HomeViewController: UITableViewDelegate, UITableViewDataSource {
                     // I am the host (or hostUID missing) -> Go to direct start/join transcription
                     var segueID = ""
                     switch item.categoryTitle {
-                        case "Office": segueID = "office"
-                        case "Family": segueID = "family"
-                        case "Friends": segueID = "friends"
-                        default: return
+                    case "Office": segueID = "office"
+                    case "Family": segueID = "family"
+                    case "Friends": segueID = "friends"
+                    default: return
                     }
                     performSegue(withIdentifier: segueID, sender: item)
                 }

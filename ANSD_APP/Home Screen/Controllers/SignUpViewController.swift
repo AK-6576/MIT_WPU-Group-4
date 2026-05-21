@@ -118,7 +118,7 @@ class SignUpViewController: UIViewController, UITableViewDelegate, UITableViewDa
 
         switch field.type {
         case .text:
-            let cell = tableView.dequeueReusableCell(withIdentifier: "SignUpCell", for: indexPath) as! SignUpTableViewCell
+            guard let cell = tableView.dequeueReusableCell(withIdentifier: "SignUpCell", for: indexPath) as? SignUpTableViewCell else { return UITableViewCell() }
             cell.configure(title: field.title, placeholder: "Enter \(field.title)", index: indexPath.row)
             cell.delegate = self
             return cell

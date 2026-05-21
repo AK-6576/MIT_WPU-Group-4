@@ -529,13 +529,13 @@ extension ChatHistoryViewController: UICollectionViewDelegate, UICollectionViewD
         let message = transcript[indexPath.row]
 
         if message.isIncoming {
-            let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "PCIncomingCell", for: indexPath) as! ViewIncomingCell
+            guard let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "PCIncomingCell", for: indexPath) as? ViewIncomingCell else { return UICollectionViewCell() }
             cell.messageLabel.text = message.text
             cell.nameLabel.text = message.senderName
             cell.editedLabel.isHidden = !message.isEdited
             return cell
         } else {
-            let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "PCOutCell", for: indexPath) as! ViewOutgoingCell
+            guard let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "PCOutCell", for: indexPath) as? ViewOutgoingCell else { return UICollectionViewCell() }
             cell.PCmessageLabel.text = message.text
             cell.editedLabel.isHidden = !message.isEdited
             return cell
@@ -595,14 +595,14 @@ extension ChatHistoryViewController: UITableViewDelegate, UITableViewDataSource,
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         switch indexPath.section {
         case 0:
-            let cell = tableView.dequeueReusableCell(withIdentifier: "PCSummarySectionHeaderCell", for: indexPath) as! ViewSummarySectionHeaderCell
+            guard let cell = tableView.dequeueReusableCell(withIdentifier: "PCSummarySectionHeaderCell", for: indexPath) as? ViewSummarySectionHeaderCell else { return UITableViewCell() }
             cell.headerLabel.text = "Conversation Summary"
             cell.headerIcon.image = UIImage(systemName: "list.clipboard")
             cell.selectionStyle = .none
             return cell
 
         case 1:
-            let cell = tableView.dequeueReusableCell(withIdentifier: "PCSummaryCardCell", for: indexPath) as! ViewSummaryCardCell
+            guard let cell = tableView.dequeueReusableCell(withIdentifier: "PCSummaryCardCell", for: indexPath) as? ViewSummaryCardCell else { return UITableViewCell() }
             cell.titleTextField.text = conversationTitle
             if let convo = histconversationData {
                 cell.dateLabel.text = convo.date
@@ -616,18 +616,18 @@ extension ChatHistoryViewController: UITableViewDelegate, UITableViewDataSource,
             return tableView.dequeueReusableCell(withIdentifier: "PCParticipantsSummaryHeaderCell", for: indexPath)
 
         case 3:
-            let cell = tableView.dequeueReusableCell(withIdentifier: "PCParticipantsCardCell", for: indexPath) as! ViewParticipantsCardCell
+            guard let cell = tableView.dequeueReusableCell(withIdentifier: "PCParticipantsCardCell", for: indexPath) as? ViewParticipantsCardCell else { return UITableViewCell() }
             cell.configure(with: participantsData[indexPath.row])
             return cell
 
         case 4:
-            let cell = tableView.dequeueReusableCell(withIdentifier: "PCSummarySectionHeaderCell", for: indexPath) as! ViewSummarySectionHeaderCell
+            guard let cell = tableView.dequeueReusableCell(withIdentifier: "PCSummarySectionHeaderCell", for: indexPath) as? ViewSummarySectionHeaderCell else { return UITableViewCell() }
             cell.headerLabel.text = "Notes"
             cell.headerIcon.image = UIImage(systemName: "note.text")
             return cell
 
         case 5:
-            let cell = tableView.dequeueReusableCell(withIdentifier: "PCNotesCardCell", for: indexPath) as! ViewNotesCardCell
+            guard let cell = tableView.dequeueReusableCell(withIdentifier: "PCNotesCardCell", for: indexPath) as? ViewNotesCardCell else { return UITableViewCell() }
             let displayNotes = histconversationData?.notes ?? generatedNotesText
 
             if !displayNotes.isEmpty && displayNotes != "Generating summary..." {

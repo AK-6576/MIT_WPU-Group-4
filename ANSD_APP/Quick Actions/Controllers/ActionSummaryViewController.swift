@@ -315,41 +315,41 @@ class BaseSummaryViewController: UIViewController, UITableViewDelegate, UITableV
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         switch indexPath.section {
         case 0:
-            let cell = tableView.dequeueReusableCell(withIdentifier: "HeaderCell", for: indexPath) as! SummarySectionHeaderCell
+            guard let cell = tableView.dequeueReusableCell(withIdentifier: "HeaderCell", for: indexPath) as? SummarySectionHeaderCell else { return UITableViewCell() }
             cell.headerLabel.text = "Conversation Summary"
             cell.headerIcon.image = UIImage(systemName: "list.clipboard")
             cell.selectionStyle = .none
             return cell
 
         case 1:
-            let cell = tableView.dequeueReusableCell(withIdentifier: "SummaryCardCell", for: indexPath) as! SummaryCardCell
+            guard let cell = tableView.dequeueReusableCell(withIdentifier: "SummaryCardCell", for: indexPath) as? SummaryCardCell else { return UITableViewCell() }
             cell.configure(title: conversationTitle, date: dateString, time: timeString, location: locationString)
             cell.delegate = self
             cell.selectionStyle = .none
             return cell
 
         case 2:
-            let cell = tableView.dequeueReusableCell(withIdentifier: "HeaderCell", for: indexPath) as! SummarySectionHeaderCell
+            guard let cell = tableView.dequeueReusableCell(withIdentifier: "HeaderCell", for: indexPath) as? SummarySectionHeaderCell else { return UITableViewCell() }
             cell.headerLabel.text = "Participant Summary"
             cell.headerIcon.image = UIImage(systemName: "person.2.fill")
             cell.selectionStyle = .none
             return cell
 
         case 3:
-            let cell = tableView.dequeueReusableCell(withIdentifier: "ParticipantsCardCell", for: indexPath) as! ParticipantCardCell
+            guard let cell = tableView.dequeueReusableCell(withIdentifier: "ParticipantsCardCell", for: indexPath) as? ParticipantCardCell else { return UITableViewCell() }
             cell.configure(with: participants[indexPath.row])
             cell.selectionStyle = .none
             return cell
 
         case 4:
-            let cell = tableView.dequeueReusableCell(withIdentifier: "HeaderCell", for: indexPath) as! SummarySectionHeaderCell
+            guard let cell = tableView.dequeueReusableCell(withIdentifier: "HeaderCell", for: indexPath) as? SummarySectionHeaderCell else { return UITableViewCell() }
             cell.headerLabel.text = "Notes"
             cell.headerIcon.image = UIImage(systemName: "note.text")
             cell.selectionStyle = .none
             return cell
 
         case 5:
-            let cell = tableView.dequeueReusableCell(withIdentifier: "NotesCardCell", for: indexPath) as! NotesCardCell
+            guard let cell = tableView.dequeueReusableCell(withIdentifier: "NotesCardCell", for: indexPath) as? NotesCardCell else { return UITableViewCell() }
             cell.notesTextView.text = self.notesText
             cell.delegate = self
             cell.selectionStyle = .none
