@@ -39,7 +39,7 @@ class GroupNewViewController: UIViewController, UICollectionViewDelegate, UIColl
         
         var otherPersonName = "Guest"
         var messages: [GroupNewChatMessage] = []
-        var cleanedMessageIndices = Set<Int>()
+        var cleanedMessageKeys = Set<String>()
         var currentSessionID: String = ""
         
     // --- FIXED PROPERTY DECLARATIONS ---
@@ -140,6 +140,25 @@ class GroupNewViewController: UIViewController, UICollectionViewDelegate, UIColl
         
         let inputNode = audioEngine.inputNode
         let recordingFormat = inputNode.outputFormat(forBus: 0)
+        
+#if targetEnvironment(simulator)
+        let alert = UIAlertController(title: "Simulator Unsupported", message: "Speech-to-text requires a physical microphone. Please test on a real device.", preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "OK", style: .default))
+        self.present(alert, animated: true)
+        self.isRecording = false
+        self.updateMicButtonVisuals(isActive: false)
+        self.removeListeningBubble()
+        return
+#else
+        guard recordingFormat.sampleRate > 0 else {
+            print("Audio Engine Error: Invalid sample rate. No physical mic detected.")
+            self.isRecording = false
+            self.updateMicButtonVisuals(isActive: false)
+            self.removeListeningBubble()
+            return
+        }
+#endif
+        
         inputNode.removeTap(onBus: 0)
         inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { (buffer, when) in
             self.recognitionRequest?.append(buffer)
@@ -251,7 +270,12 @@ class GroupNewViewController: UIViewController, UICollectionViewDelegate, UIColl
                 if let error = error {
                     if !self.isRestarting {
                         print("Speech Error: \(error)")
-                        self.stopRecording()
+                        let nsError = error as NSError
+                        if self.isRecording && (nsError.domain == "kAFAssistantErrorDomain" || nsError.code == 203 || nsError.code == 216 || nsError.code == 1107) {
+                            self.restartRecordingCycle()
+                        } else {
+                            self.stopRecording()
+                        }
                     } else {
                         self.isRestarting = false
                     }
@@ -262,8 +286,9 @@ class GroupNewViewController: UIViewController, UICollectionViewDelegate, UIColl
     
     // MARK: - Apple Intelligence Logic
     private func processTextWithAppleIntelligence(text: String, index: Int) {
-        if cleanedMessageIndices.contains(index) { return }
-        cleanedMessageIndices.insert(index)
+        let trackingKey = "\(self.currentUserID)_\(text)"
+        if cleanedMessageKeys.contains(trackingKey) { return }
+        cleanedMessageKeys.insert(trackingKey)
         
         Task {
             do {
@@ -293,11 +318,12 @@ class GroupNewViewController: UIViewController, UICollectionViewDelegate, UIColl
                     cleanedText = text
                 }
                 
-                await MainActor.run {
+                await MainActor.run { [weak self] in
+                    guard let self = self else { return }
                     // Update Local UI
-                    if index < self.messages.count {
-                        self.messages[index].text = cleanedText
-                        self.collectionView.reloadItems(at: [IndexPath(item: index, section: 0)])
+                    if let directIndex = self.messages.firstIndex(where: { $0.text == text && $0.senderID == self.currentUserID }) {
+                        self.messages[directIndex].text = cleanedText
+                        self.collectionView.reloadItems(at: [IndexPath(item: directIndex, section: 0)])
                         
                         // Send to Firebase
                         self.firebase.send(text: cleanedText, sender: self.myName, senderID: self.currentUserID)
@@ -390,6 +416,10 @@ class GroupNewViewController: UIViewController, UICollectionViewDelegate, UIColl
                let sender = data["sender"] as? String,
                let senderID = data["senderID"] as? String {
                 
+                let trackingKey = "\(senderID)_\(text)"
+                if self.cleanedMessageKeys.contains(trackingKey) { return }
+                self.cleanedMessageKeys.insert(trackingKey)
+                
                 if senderID == self.currentUserID {
                     let lastFinalized = self.messages.last(where: {
                         $0.text != "Listening..." && $0.text != "..." && !$0.isIncoming
@@ -399,7 +429,12 @@ class GroupNewViewController: UIViewController, UICollectionViewDelegate, UIColl
                     }
                 }
                 
-                let isListeningPresent = (self.messages.last?.text == "Listening..." || self.messages.last?.text == "...") && !self.messages.last!.isIncoming
+                let isListeningPresent: Bool
+                if let last = self.messages.last {
+                    isListeningPresent = (last.text == "Listening..." || last.text == "...") && !last.isIncoming
+                } else {
+                    isListeningPresent = false
+                }
                 
                 if isListeningPresent {
                     self.removeListeningBubble()

@@ -43,10 +43,9 @@ class FirebaseManager {
     ///   - isHost: Boolean to determine if current user is starting the session.
     func setupSession(hostUID: String, conversationID: String, isHost: Bool) {
         let safeUID = CryptoHelper.hashIdentifier(hostUID)
-        let safeConvID = CryptoHelper.hashIdentifier(conversationID)
+        let safeConvID = CryptoHelper.hashIdentifier(conversationID.uppercased())
         
         guard !safeUID.isEmpty, !safeConvID.isEmpty else {
-            // print("DEBUG: Firebase - Cannot setup session with empty IDs")
             return
         }
         
@@ -85,29 +84,41 @@ class FirebaseManager {
         
         // .childAdded pulls all previous history immediately AND stays active for new messages.
         sessionRef.observe(.childAdded) { snapshot, _ in
-            if var value = snapshot.value as? [String: Any] {
+            guard let value = snapshot.value as? [String: Any] else { return }
+            
+            DispatchQueue.global(qos: .userInitiated).async {
+                var decryptedValue = value
+                
                 // Decrypt PII
                 if let encryptedText = value["text"] as? String {
-                    value["text"] = CryptoHelper.decrypt(encryptedText) ?? ""
+                    decryptedValue["text"] = CryptoHelper.decrypt(encryptedText) ?? ""
                 }
                 if let encryptedSender = value["sender"] as? String {
-                    value["sender"] = CryptoHelper.decrypt(encryptedSender) ?? ""
+                    decryptedValue["sender"] = CryptoHelper.decrypt(encryptedSender) ?? ""
                 }
                 
-                completion(value)
+                DispatchQueue.main.async {
+                    completion(decryptedValue)
+                }
             }
         }
     }
     
     func send(text: String, sender: String, senderID: String) {
-        let dict: [String: Any] = [
-            "text": CryptoHelper.encrypt(text) ?? "",
-            "sender": CryptoHelper.encrypt(sender) ?? "",
-            "senderID": senderID,
-            "timestamp": ServerValue.timestamp()
-        ]
-        // This writes to the 'messages' node of whatever room was set in setupSession()
-        ref?.child("messages").childByAutoId().setValue(dict)
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            let encryptedText = CryptoHelper.encrypt(text) ?? ""
+            let encryptedSender = CryptoHelper.encrypt(sender) ?? ""
+            
+            let dict: [String: Any] = [
+                "text": encryptedText,
+                "sender": encryptedSender,
+                "senderID": senderID,
+                "timestamp": ServerValue.timestamp()
+            ]
+            
+            // This writes to the 'messages' node of whatever room was set in setupSession()
+            self?.ref?.child("messages").childByAutoId().setValue(dict)
+        }
     }
     
     // MARK: - Mirroring Logic (Sync across Users)
@@ -125,7 +136,7 @@ class FirebaseManager {
         ]
         
         let safeMyUID = CryptoHelper.hashIdentifier(myUID)
-        let safeConvID = CryptoHelper.hashIdentifier(conversationID)
+        let safeConvID = CryptoHelper.hashIdentifier(conversationID.uppercased())
         
         // Save to the JOINER'S personal node: users/{joinerUID}/conversations/{roomID}
         databaseRef.child("users").child(safeMyUID).child("conversations").child(safeConvID).updateChildValues(linkData)
@@ -136,7 +147,7 @@ class FirebaseManager {
     func saveConversationMetadata(_ conversation: Conversation) {
         guard let uid = currentUID else { return }
         let safeUID = CryptoHelper.hashIdentifier(uid)
-        let safeConvID = CryptoHelper.hashIdentifier(conversation.id)
+        let safeConvID = CryptoHelper.hashIdentifier(conversation.id.uppercased())
         
         let metadata: [String: Any] = [
             "id": CryptoHelper.encrypt(conversation.id) ?? "",
@@ -159,7 +170,7 @@ class FirebaseManager {
     func deleteConversationMetadata(convoID: String) {
         guard let uid = currentUID else { return }
         let safeUID = CryptoHelper.hashIdentifier(uid)
-        let safeConvID = CryptoHelper.hashIdentifier(convoID)
+        let safeConvID = CryptoHelper.hashIdentifier(convoID.uppercased())
         databaseRef.child("users").child(safeUID).child("conversations").child(safeConvID).removeValue()
         // Also remove from the "history" node used for full transcripts
         databaseRef.child("users").child(safeUID).child("history").child(safeConvID).removeValue()
@@ -169,7 +180,7 @@ class FirebaseManager {
     func deleteQuickAction(actionID: String) {
         guard let uid = currentUID else { return }
         let safeUID = CryptoHelper.hashIdentifier(uid)
-        let safeCode = CryptoHelper.hashIdentifier(actionID)
+        let safeCode = CryptoHelper.hashIdentifier(actionID.uppercased())
         
         // 1. Remove from global registry
         databaseRef.child("quick_actions").child(safeCode).removeValue()
@@ -194,7 +205,7 @@ class FirebaseManager {
     func saveFullConversation(_ conversation: Conversation) {
         guard let uid = currentUID else { return }
         let safeUID = CryptoHelper.hashIdentifier(uid)
-        let safeConvID = CryptoHelper.hashIdentifier(conversation.id)
+        let safeConvID = CryptoHelper.hashIdentifier(conversation.id.uppercased())
         
         // 1. Prepare Metadata
         var metadata: [String: Any] = [
@@ -268,7 +279,7 @@ class FirebaseManager {
     /// Restores full conversation history (messages + participants) for a given ID
     func fetchFullConversation(uid: String, conversationID: String, completion: @escaping ([String: Any]?) -> Void) {
         let safeUID = CryptoHelper.hashIdentifier(uid)
-        let safeConvID = CryptoHelper.hashIdentifier(conversationID)
+        let safeConvID = CryptoHelper.hashIdentifier(conversationID.uppercased())
         databaseRef.child("users").child(safeUID).child("history").child(safeConvID).observeSingleEvent(of: .value) { snapshot in
             guard var data = snapshot.value as? [String: Any] else {
                 completion(nil)
@@ -315,7 +326,7 @@ class FirebaseManager {
     // MARK: - Quick Action Sync Integration
     func saveQuickActionMetadata(_ action: RoutineConversation, hostUID: String) {        let safeHost = CryptoHelper.hashIdentifier(hostUID)
         guard let code = action.roomCode else { return }
-        let safeCode = CryptoHelper.hashIdentifier(code)
+        let safeCode = CryptoHelper.hashIdentifier(code.uppercased())
         
         let metadata: [String: Any] = [
             "id": CryptoHelper.encrypt(action.id) ?? "",
@@ -416,7 +427,7 @@ class FirebaseManager {
     
     /// Mark a user as "online" in a Quick Action room
     func setPresence(roomCode: String, userName: String) {
-        let safeCode = CryptoHelper.hashIdentifier(roomCode)
+        let safeCode = CryptoHelper.hashIdentifier(roomCode.uppercased())
         let safeNameHash = CryptoHelper.hashIdentifier(userName.trimmingCharacters(in: .whitespacesAndNewlines).lowercased())
         let encryptedName = CryptoHelper.encrypt(userName) ?? ""
         databaseRef.child("quick_actions").child(safeCode).child("presence").child(safeNameHash).setValue(encryptedName)
@@ -424,14 +435,14 @@ class FirebaseManager {
     
     /// Remove a user's presence when they leave the session
     func removePresence(roomCode: String, userName: String) {
-        let safeCode = CryptoHelper.hashIdentifier(roomCode)
+        let safeCode = CryptoHelper.hashIdentifier(roomCode.uppercased())
         let safeNameHash = CryptoHelper.hashIdentifier(userName.trimmingCharacters(in: .whitespacesAndNewlines).lowercased())
         databaseRef.child("quick_actions").child(safeCode).child("presence").child(safeNameHash).removeValue()
     }
     
     /// Observe presence in real time — returns a Set of online decrypted user names
     func observePresence(roomCode: String, completion: @escaping (Set<String>) -> Void) {
-        let safeCode = CryptoHelper.hashIdentifier(roomCode)
+        let safeCode = CryptoHelper.hashIdentifier(roomCode.uppercased())
         databaseRef.child("quick_actions").child(safeCode).child("presence").observe(.value) { snapshot in
             var onlineNames = Set<String>()
             if let dict = snapshot.value as? [String: Any] {
@@ -447,19 +458,19 @@ class FirebaseManager {
     
     /// Stop observing presence for a room
     func stopObservingPresence(roomCode: String) {
-        let safeCode = CryptoHelper.hashIdentifier(roomCode)
+        let safeCode = CryptoHelper.hashIdentifier(roomCode.uppercased())
         databaseRef.child("quick_actions").child(safeCode).child("presence").removeAllObservers()
     }
     
     // MARK: - Authentication
     func registerRoom(code: String, hostUID: String) {
-        let safeCode = CryptoHelper.hashIdentifier(code)
+        let safeCode = CryptoHelper.hashIdentifier(code.uppercased())
         databaseRef.child("room_registry").child(safeCode).setValue(["hostUID": CryptoHelper.encrypt(hostUID) ?? ""])
     }
     
     /// Guest calls this to find the hostUID using only the Room Code
     func findHostID(for code: String, completion: @escaping (String?) -> Void) {
-        let safeCode = CryptoHelper.hashIdentifier(code)
+        let safeCode = CryptoHelper.hashIdentifier(code.uppercased())
         databaseRef.child("room_registry").child(safeCode).child("hostUID").observeSingleEvent(of: .value) { snapshot in
             if let encryptedUID = snapshot.value as? String {
                 completion(CryptoHelper.decrypt(encryptedUID))

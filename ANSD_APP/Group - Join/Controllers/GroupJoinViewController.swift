@@ -11,8 +11,8 @@ import AVFoundation
 import Speech
 import Combine
 import FoundationModels // Apple Intelligence
-import FirebaseAuth    // Required to fix "Cannot find 'Auth' in scope"
-import FirebaseDatabase // Required for Firebase types
+import FirebaseAuth
+import FirebaseDatabase
 
 class GroupJoinViewController: UIViewController, UICollectionViewDelegate, UICollectionViewDataSource, UICollectionViewDelegateFlowLayout, SFSpeechRecognizerDelegate {
     
@@ -26,8 +26,19 @@ class GroupJoinViewController: UIViewController, UICollectionViewDelegate, UICol
     private let firebase = FirebaseManager.shared
     private let cleanupManager = TextCleanupManager()
     
-    // Apple Intelligence on-device language model used for text cleanup.
+    // Reused single instance session to prevent continuous memory allocations
     private let model = SystemLanguageModel.default
+    private lazy var aiSession: LanguageModelSession = {
+        let instructions = """
+        You are a real-time text cleanup assistant for a live captioning app designed for people with hearing loss. Your sole job is to fix grammar and punctuation in conversational speech-to-text output.
+        GUARDRAILS:
+        - Never fabricate information not present in the input.
+        - If input is empty or unintelligible, return it as-is.
+        - Always respond in the SAME language as input.
+        - Return ONLY the cleaned text with no extra formatting, apologies, or explanation.
+        """
+        return LanguageModelSession(model: model, instructions: instructions)
+    }()
     
     private var speechRecognizer = SFSpeechRecognizer(locale: LanguageManager.shared.currentLocale)
     private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
@@ -40,19 +51,15 @@ class GroupJoinViewController: UIViewController, UICollectionViewDelegate, UICol
     var isRestarting = false
     
     var messages: [GroupJoinChatMessage] = []
-    var cleanedMessageIndices = Set<Int>()
+    // Track cleaned messages safely by unique IDs instead of fragile array indexing
+    var cleanedMessageKeys = Set<String>()
     var isSessionEnded = false
     
-    // Tracks the character offset into the full cumulative transcript string to extract only new speech.
     var consumedTranscriptOffset = 0
-    
-    // Session identifiers passed from the session selection screen.
     var currentSessionID: String = ""
     var sessionTitle: String = "Session"
     var hostUserIDFromLink: String = ""
     
-    // Fixed: Using a computed property to safely fetch the Firebase UID
-    // CRITICAL: Must sanitize to match GroupNewViewController & ActionJoinViewController
     var currentUserID: String {
         let rawID = Auth.auth().currentUser?.uid ?? UIDevice.current.identifierForVendor?.uuidString ?? "GuestUser"
         return rawID.components(separatedBy: CharacterSet(charactersIn: ".#$[]")).joined(separator: "_")
@@ -62,8 +69,6 @@ class GroupJoinViewController: UIViewController, UICollectionViewDelegate, UICol
         UserDefaults.standard.string(forKey: "user_first_name") ?? UIDevice.current.name
     }
     var otherPersonName = "Host"
-    
-    // Constant for bubble splitting (Adjust based on your UI)
     let MAX_BUBBLE_CHAR_LIMIT = 240
 
     // MARK: - Lifecycle
@@ -74,27 +79,20 @@ class GroupJoinViewController: UIViewController, UICollectionViewDelegate, UICol
         setupAudioSession()
         
         self.title = sessionTitle
-        
         NotificationCenter.default.addObserver(self, selector: #selector(handleLanguageChange), name: .languageDidChange, object: nil)
         
         if !currentSessionID.isEmpty {
-                // Only have the code? Find the Host UID first!
-                firebase.findHostID(for: currentSessionID) { [weak self] hostUID in
-                    guard let self = self, let uid = hostUID else {
-                        // print("DEBUG: Room code not found.")
-                        return
-                    }
-                    self.hostUserIDFromLink = uid
-                    self.startSession() // Now startSession has the correct UID
-                }
+            firebase.findHostID(for: currentSessionID) { [weak self] hostUID in
+                guard let self = self, let uid = hostUID else { return }
+                self.hostUserIDFromLink = uid
+                self.startSession()
             }
+        }
     }
     
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
-        if !isRecording {
-            startRecording()
-        }
+        if !isRecording { startRecording() }
     }
     
     override func viewWillDisappear(_ animated: Bool) {
@@ -121,7 +119,7 @@ class GroupJoinViewController: UIViewController, UICollectionViewDelegate, UICol
         do {
             let session = AVAudioSession.sharedInstance()
             try session.setCategory(.playAndRecord, mode: .voiceChat, options: [.duckOthers, .defaultToSpeaker, .allowBluetoothHFP])
-            try session.setActive(true)
+            try session.setActive(true, options: .notifyOthersOnDeactivation)
         } catch {
             print("Audio Session Error: \(error)")
         }
@@ -151,10 +149,30 @@ class GroupJoinViewController: UIViewController, UICollectionViewDelegate, UICol
         recognitionRequest = request
         
         let inputNode = audioEngine.inputNode
-        let recordingFormat = inputNode.outputFormat(forBus: 0)
+        // FIX 1: Safe hardware device input alignment
+        let hardwareFormat = inputNode.inputFormat(forBus: 0)
+        
+#if targetEnvironment(simulator)
+        let alert = UIAlertController(title: "Simulator Unsupported", message: "Speech-to-text requires a physical microphone. Please test on a real device.", preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "OK", style: .default))
+        self.present(alert, animated: true)
+        self.isRecording = false
+        self.updateMicButtonVisuals(isActive: false)
+        self.removeListeningBubble()
+        return
+#else
+        guard hardwareFormat.sampleRate > 0 else {
+            print("Audio Engine Error: Invalid sample rate. No physical mic detected.")
+            self.isRecording = false
+            self.updateMicButtonVisuals(isActive: false)
+            self.removeListeningBubble()
+            return
+        }
+#endif
+        
         inputNode.removeTap(onBus: 0)
-        inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { (buffer, when) in
-            self.recognitionRequest?.append(buffer)
+        inputNode.installTap(onBus: 0, bufferSize: 1024, format: hardwareFormat) { [weak self] (buffer, when) in
+            self?.recognitionRequest?.append(buffer)
         }
         
         audioEngine.prepare()
@@ -188,12 +206,11 @@ class GroupJoinViewController: UIViewController, UICollectionViewDelegate, UICol
                     
                     if let lastIndex = self.messages.lastIndex(where: { !$0.isIncoming }) {
                         let currentText = self.messages[lastIndex].text
-                        let isPlaceholder = (currentText == "Listening..." || currentText == "..." || currentText == "Identifying\u{2026}" || currentText == "Identifying...")
+                        let isPlaceholder = (currentText == "Listening..." || currentText == "..." || currentText == "Identifying\u{2026}")
                         let baseText = isPlaceholder ? "" : currentText
                         let combinedText = baseText + newContent
                         
                         if combinedText.count > self.MAX_BUBBLE_CHAR_LIMIT {
-                            // Find the last sentence boundary to split at
                             let boundaries = [". ", "? ", "! ", ".\n", "?\n", "!\n"]
                             var splitIndex: String.Index? = nil
                             
@@ -213,13 +230,14 @@ class GroupJoinViewController: UIViewController, UICollectionViewDelegate, UICol
                                 
                                 self.messages[lastIndex].text = firstPart
                                 self.GroupJoinCollectionView.reloadItems(at: [IndexPath(item: lastIndex, section: 0)])
-                                self.processTextWithAppleIntelligence(text: firstPart, index: lastIndex)
+                                
+                                // Call processing with the safe targeted object instead of indices
+                                self.processTextWithAppleIntelligence(text: firstPart, originalMessageIndex: lastIndex)
                                 
                                 let newMsg = GroupJoinChatMessage(text: secondPart.isEmpty ? "..." : secondPart, isIncoming: false, sender: self.myName, senderID: self.currentUserID)
                                 self.messages.append(newMsg)
                                 self.reloadDataAndScroll()
                             } else {
-                                // No boundary found yet, just append to current
                                 self.messages[lastIndex].text = combinedText
                                 self.GroupJoinCollectionView.reloadItems(at: [IndexPath(item: lastIndex, section: 0)])
                             }
@@ -234,7 +252,7 @@ class GroupJoinViewController: UIViewController, UICollectionViewDelegate, UICol
                                 if let finalIndex = self.messages.lastIndex(where: { !$0.isIncoming }) {
                                     let finalText = self.messages[finalIndex].text
                                     if finalText != "Listening..." && finalText != "..." && !finalText.isEmpty {
-                                        self.processTextWithAppleIntelligence(text: finalText, index: finalIndex)
+                                        self.processTextWithAppleIntelligence(text: finalText, originalMessageIndex: finalIndex)
                                     }
                                 }
                                 if self.isRecording {
@@ -242,14 +260,18 @@ class GroupJoinViewController: UIViewController, UICollectionViewDelegate, UICol
                                 }
                             }
                         }
-                        
                     }
                 }
                 
                 if let error = error {
                     if !self.isRestarting {
                         print("Speech Error: \(error)")
-                        self.stopRecording()
+                        let nsError = error as NSError
+                        if self.isRecording && (nsError.domain == "kAFAssistantErrorDomain" || nsError.code == 203 || nsError.code == 216 || nsError.code == 1107) {
+                            self.restartRecordingCycle()
+                        } else {
+                            self.stopRecording()
+                        }
                     } else {
                         self.isRestarting = false
                     }
@@ -259,48 +281,46 @@ class GroupJoinViewController: UIViewController, UICollectionViewDelegate, UICol
     }
     
     // MARK: - Apple Intelligence Logic
-    private func processTextWithAppleIntelligence(text: String, index: Int) {
-        if cleanedMessageIndices.contains(index) { return }
-        cleanedMessageIndices.insert(index)
+    // MARK: - Apple Intelligence Logic
+    private func processTextWithAppleIntelligence(text: String, originalMessageIndex: Int) {
+        // 1. Create a stable, unique tracking key based on sender and content
+        let trackingKey = "\(self.currentUserID)_\(text)"
         
-        Task {
+        // 2. Safety validation utilizing the custom compound string key
+        if cleanedMessageKeys.contains(trackingKey) { return }
+        cleanedMessageKeys.insert(trackingKey)
+        
+        Task { [weak self] in
+            guard let self = self else { return }
             do {
-                let instructions = """
-                You are a real-time text cleanup assistant for a live captioning app designed for people with hearing loss. Your sole job is to fix grammar and punctuation in conversational speech-to-text output.
-
-                GUARDRAILS:
-                - Never fabricate, hallucinate, or invent information not present in the input.
-                - Never produce harmful, offensive, biased, or discriminatory content.
-                - If the input is empty, unintelligible, or meaningless, return it as-is without any additional words.
-                - Always respond in the SAME language as the input.
-                - Never include commentary, apologies, disclaimers, or boilerplate text.
-                - Return ONLY the cleaned text with no extra formatting or explanation.
-                """
                 let prompt = """
                 Clean up the following conversational text by fixing grammar and punctuation. Return ONLY the cleaned text.
-                
                 Text: "\(text)"
                 """
-                let session = LanguageModelSession(model: model, instructions: instructions)
-                let response = try await session.respond(to: prompt)
+                
+                let response = try await self.aiSession.respond(to: prompt)
                 var cleanedText = response.content.trimmingCharacters(in: .whitespacesAndNewlines)
                 
-                // Safety filter: If AI returns a commentary/apology, discard cleanup and use original text
                 let lowercaseResponse = cleanedText.lowercased()
                 if lowercaseResponse.contains("i'm sorry") || lowercaseResponse.contains("as an ai") || lowercaseResponse.contains("can't process") {
                     cleanedText = text
                 }
                 
-                await MainActor.run {
-                    if index < self.messages.count {
-                        self.messages[index].text = cleanedText
-                        self.GroupJoinCollectionView.reloadItems(at: [IndexPath(item: index, section: 0)])
+                await MainActor.run { [weak self] in
+                    guard let self = self else { return }
+                    
+                    // 3. Locate the target message safely by matching the specific sender and text content
+                    // (This protects against array race conditions/shifting indices)
+                    if let directIndex = self.messages.firstIndex(where: { $0.text == text && $0.senderID == self.currentUserID }) {
+                        self.messages[directIndex].text = cleanedText
+                        self.GroupJoinCollectionView.reloadItems(at: [IndexPath(item: directIndex, section: 0)])
                         self.firebase.send(text: cleanedText, sender: self.myName, senderID: self.currentUserID)
                     }
                 }
             } catch {
                 print("Apple Intelligence Error: \(error)")
-                await MainActor.run {
+                await MainActor.run { [weak self] in
+                    guard let self = self else { return }
                     self.firebase.send(text: text, sender: self.myName, senderID: self.currentUserID)
                 }
             }
@@ -347,79 +367,54 @@ class GroupJoinViewController: UIViewController, UICollectionViewDelegate, UICol
     
     private func startSession() {
         let targetUID = hostUserIDFromLink
-        
         if targetUID.isEmpty { return }
-
-        // 1. Point the Firebase reference to the HOST'S folder (The Source of Truth)
         firebase.setupSession(hostUID: targetUID, conversationID: currentSessionID, isHost: isHost)
-        
-        // 2. Mirror the room info to the JOINER'S folder so it shows in their personal history
-        firebase.linkConversationToJoiner(hostUID: targetUID,
-                                         conversationID: currentSessionID,
-                                         conversationTitle: self.sessionTitle)
-        
-        // 3. Start observing (this will now pull all history from the host's folder)
+        firebase.linkConversationToJoiner(hostUID: targetUID, conversationID: currentSessionID, conversationTitle: self.sessionTitle)
         setupFirebaseObservers()
     }
 
     private func setupFirebaseObservers() {
-        // Observe Session Status (Ended/Active)
         firebase.observeSessionStatus { [weak self] status in
             guard let self = self else { return }
-            if status == "ended" {
-                // print("DEBUG: Session ended signal received.")
-                self.handleGlobalSessionEnd()
-            }
+            if status == "ended" { self.handleGlobalSessionEnd() }
         }
         
-        // Observe Incoming Messages
-        // Firebase Manager's .childAdded will now pull history + new messages
         firebase.observeMessages { [weak self] data in
             guard let self = self else { return }
-            
             guard let text = data["text"] as? String,
                   let sender = data["sender"] as? String,
                   let senderID = data["senderID"] as? String else { return }
-                
-            // Deduplication: Don't add if we just sent this locally
+            
             if senderID == self.currentUserID {
                 let lastFinalized = self.messages.last(where: { !$0.isIncoming && $0.text != "..." && $0.text != "Listening..." })
-                if let last = lastFinalized, last.text == text {
-                    return
-                }
+                if let last = lastFinalized, last.text == text { return }
             }
             
-            // Update UI on Main Thread
-            DispatchQueue.main.async {
-                self.processIncomingMessage(text: text, sender: sender, senderID: senderID)
-            }
+            self.processIncomingMessage(text: text, sender: sender, senderID: senderID)
         }
     }
 
     private func processIncomingMessage(text: String, sender: String, senderID: String) {
-        // Deduplication: Check if the message is already in our list (matching text and sender)
-        if messages.contains(where: { $0.text == text && $0.senderID == senderID }) {
-            return
+        let trackingKey = "\(senderID)_\(text)"
+        if cleanedMessageKeys.contains(trackingKey) { return }
+        cleanedMessageKeys.insert(trackingKey)
+        
+        if messages.contains(where: { $0.text == text && $0.senderID == senderID }) { return }
+        
+        let isListeningPresent: Bool
+        if let last = self.messages.last {
+            isListeningPresent = (last.text == "Listening..." || last.text == "...") && !last.isIncoming
+        } else {
+            isListeningPresent = false
         }
         
-        let isListeningPresent = (self.messages.last?.text == "Listening..." || self.messages.last?.text == "...") && !self.messages.last!.isIncoming
+        if isListeningPresent { self.removeListeningBubble() }
         
-        if isListeningPresent {
-            self.removeListeningBubble()
-        }
-        
-        let msg = GroupJoinChatMessage(
-            text: text,
-            isIncoming: (senderID != self.currentUserID),
-            sender: sender,
-            senderID: senderID
-        )
+        let msg = GroupJoinChatMessage(text: text, isIncoming: (senderID != self.currentUserID), sender: sender, senderID: senderID)
         self.messages.append(msg)
         self.reloadDataAndScroll()
         
-        if isListeningPresent && self.isRecording {
-            self.addListeningBubble()
-        }
+        if isListeningPresent && self.isRecording { self.addListeningBubble() }
     }
     
     // MARK: - Actions
@@ -450,12 +445,7 @@ class GroupJoinViewController: UIViewController, UICollectionViewDelegate, UICol
         
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
             guard let self = self else { return }
-            
-            if self.isRecording {
-                self.stopRecording()
-            } else {
-                self.removeListeningBubble()
-            }
+            if self.isRecording { self.stopRecording() } else { self.removeListeningBubble() }
             
             let storyboard = UIStoryboard(name: "Group-Join", bundle: nil)
             if let summaryVC = storyboard.instantiateViewController(withIdentifier: "GroupJoinSummaryViewController") as? GroupJoinSummaryViewController {
@@ -503,8 +493,7 @@ class GroupJoinViewController: UIViewController, UICollectionViewDelegate, UICol
             cell.configure(with: message)
             return cell
         }
-    }    
-    func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, sizeForItemAt indexPath: IndexPath) -> CGSize {
-        return CGSize(width: collectionView.bounds.width, height: 50)
     }
+    
+    // FIX 3: Removed sizeForItemAt completely to stop Auto Layout engine constraint fights.
 }
