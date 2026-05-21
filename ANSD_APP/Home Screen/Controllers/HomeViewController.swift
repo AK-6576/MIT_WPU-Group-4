@@ -232,11 +232,8 @@ class HomeViewController: UIViewController {
     /// Call once at app launch to configure the TipKit data store.
     private func configureTipKit() {
         do {
-            // In production: Tips.configure()
-            // During development/testing you can use:
-            // try Tips.resetDatastore()           // ← uncomment to reset tips during QA
-            // try Tips.configure([.displayFrequency(.immediate)])  // ← show all tips immediately for testing
-            try Tips.configure()
+            // Use immediate display frequency so the back-to-back tour works.
+            try Tips.configure([.displayFrequency(.immediate)])
         } catch {
             print("HomeTips: TipKit configuration failed — \(error)")
         }
@@ -338,7 +335,7 @@ class HomeViewController: UIViewController {
             try? await Task.sleep(for: .milliseconds(100))
             // If user tapped 'X' or outside, the popover will be dismissed
             if popover.isBeingDismissed || popover.presentingViewController == nil {
-                return false // User dismissed, exit tour
+                return true // User dismissed this tip, proceed to the next one
             }
         }
 
