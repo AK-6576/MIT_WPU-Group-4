@@ -37,17 +37,17 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		02AE994B2ED5711C0079EA2B /* ANSD_APP.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ANSD_APP.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		02AE994B2ED5711C0079EA2B /* Samwaad.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Samwaad.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		BF1B1AAE2F4070EF00C4F236 /* VL1004.mlpackage */ = {isa = PBXFileReference; lastKnownFileType = folder.mlpackage; path = VL1004.mlpackage; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		02AE995D2ED5711D0079EA2B /* Exceptions for "ANSD_APP" folder in "ANSD_APP" target */ = {
+		02AE995D2ED5711D0079EA2B /* Exceptions for "ANSD_APP" folder in "Samwaad" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
 			);
-			target = 02AE994A2ED5711C0079EA2B /* ANSD_APP */;
+			target = 02AE994A2ED5711C0079EA2B /* Samwaad */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
@@ -55,7 +55,7 @@
 		02AE994D2ED5711C0079EA2B /* ANSD_APP */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
-				02AE995D2ED5711D0079EA2B /* Exceptions for "ANSD_APP" folder in "ANSD_APP" target */,
+				02AE995D2ED5711D0079EA2B /* Exceptions for "ANSD_APP" folder in "Samwaad" target */,
 			);
 			path = ANSD_APP;
 			sourceTree = "<group>";
@@ -112,7 +112,7 @@
 		02AE994C2ED5711C0079EA2B /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				02AE994B2ED5711C0079EA2B /* ANSD_APP.app */,
+				02AE994B2ED5711C0079EA2B /* Samwaad.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -127,9 +127,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		02AE994A2ED5711C0079EA2B /* ANSD_APP */ = {
+		02AE994A2ED5711C0079EA2B /* Samwaad */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 02AE995E2ED5711D0079EA2B /* Build configuration list for PBXNativeTarget "ANSD_APP" */;
+			buildConfigurationList = 02AE995E2ED5711D0079EA2B /* Build configuration list for PBXNativeTarget "Samwaad" */;
 			buildPhases = (
 				02AE99472ED5711C0079EA2B /* Sources */,
 				02AE99482ED5711C0079EA2B /* Frameworks */,
@@ -142,7 +142,7 @@
 			fileSystemSynchronizedGroups = (
 				02AE994D2ED5711C0079EA2B /* ANSD_APP */,
 			);
-			name = ANSD_APP;
+			name = Samwaad;
 			packageProductDependencies = (
 				BFDA3C6E2F40735600445EC1 /* FirebaseAI */,
 				BFDA3C702F40735600445EC1 /* FirebaseAILogic */,
@@ -172,7 +172,7 @@
 				02D7E7C62F6D143A00C20BC2 /* GoogleSignInSwift */,
 			);
 			productName = ANSD_APP;
-			productReference = 02AE994B2ED5711C0079EA2B /* ANSD_APP.app */;
+			productReference = 02AE994B2ED5711C0079EA2B /* Samwaad.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -190,7 +190,7 @@
 					};
 				};
 			};
-			buildConfigurationList = 02AE99462ED5711C0079EA2B /* Build configuration list for PBXProject "ANSD_APP" */;
+			buildConfigurationList = 02AE99462ED5711C0079EA2B /* Build configuration list for PBXProject "Samwaad" */;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -209,7 +209,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				02AE994A2ED5711C0079EA2B /* ANSD_APP */,
+				02AE994A2ED5711C0079EA2B /* Samwaad */,
 			);
 		};
 /* End PBXProject section */
@@ -223,8 +223,6 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
-
-
 
 /* Begin PBXSourcesBuildPhase section */
 		02AE99472ED5711C0079EA2B /* Sources */ = {
@@ -438,7 +436,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		02AE99462ED5711C0079EA2B /* Build configuration list for PBXProject "ANSD_APP" */ = {
+		02AE99462ED5711C0079EA2B /* Build configuration list for PBXProject "Samwaad" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				02AE99612ED5711D0079EA2B /* Debug */,
@@ -447,7 +445,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		02AE995E2ED5711D0079EA2B /* Build configuration list for PBXNativeTarget "ANSD_APP" */ = {
+		02AE995E2ED5711D0079EA2B /* Build configuration list for PBXNativeTarget "Samwaad" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				02AE995F2ED5711D0079EA2B /* Debug */,
