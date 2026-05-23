@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="ANSD_APP/Assets.xcassets/AppIcon.appiconset/AppLogo.png" alt="Sāmwaad Logo" width="120" height="120" style="border-radius: 24px;" />
+  <img src="ANSD_APP/Assets.xcassets/AppIcon.appiconset" alt="Sāmwaad Logo" width="120" height="120" style="border-radius: 24px;" />
 </p>
 
 <h1 align="center">Sāmwaad</h1>
