@@ -124,17 +124,40 @@ class WelcomeViewController: UIViewController, UITextFieldDelegate {
     private func restoreUserAndNavigate(user: User, isNewUser: Bool) {
         let uid = user.uid
 
-        // Fetch user profile from Realtime Database
+        // 1. Set Google/Firebase Auth Profile as baseline
+        if let displayName = user.displayName, !displayName.isEmpty {
+            let components = displayName.components(separatedBy: " ")
+            if let first = components.first, !first.isEmpty {
+                ProfileManager.shared.firstName = first
+            }
+            if components.count > 1 {
+                let last = components.dropFirst().joined(separator: " ")
+                ProfileManager.shared.lastName = last
+            }
+        }
+        
+        // Load profile picture
+        if let photoURL = user.photoURL {
+            URLSession.shared.dataTask(with: photoURL) { data, _, _ in
+                if let data = data, let image = UIImage(data: data) {
+                    DispatchQueue.main.async {
+                        ProfileManager.shared.profileImage = image
+                    }
+                }
+            }.resume()
+        }
+
+        // 2. Fetch user profile from Realtime Database (to override with any user customizations)
         FirebaseManager.shared.fetchUserProfile(uid: uid) { profileData in
             DispatchQueue.main.async {
                 if let data = profileData {
                     let firstName = data["firstName"] as? String ?? ""
                     let lastName = data["lastName"] as? String ?? ""
                     if !firstName.isEmpty {
-                        UserDefaults.standard.set(firstName, forKey: "user_first_name")
+                        ProfileManager.shared.firstName = firstName
                     }
                     if !lastName.isEmpty {
-                        UserDefaults.standard.set(lastName, forKey: "user_last_name")
+                        ProfileManager.shared.lastName = lastName
                     }
                 }
 
@@ -333,24 +356,50 @@ class WelcomeViewController: UIViewController, UITextFieldDelegate {
                 switch result {
                 case .success(let user):
                     let uid = user.uid
-                    // Fetch user profile
+                    
+                    // 1. Set Google/Firebase Auth Profile as baseline
+                    if let displayName = user.displayName, !displayName.isEmpty {
+                        let components = displayName.components(separatedBy: " ")
+                        if let first = components.first, !first.isEmpty {
+                            ProfileManager.shared.firstName = first
+                        }
+                        if components.count > 1 {
+                            let last = components.dropFirst().joined(separator: " ")
+                            ProfileManager.shared.lastName = last
+                        }
+                    }
+                    
+                    // Load profile picture
+                    if let photoURL = user.photoURL {
+                        URLSession.shared.dataTask(with: photoURL) { data, _, _ in
+                            if let data = data, let image = UIImage(data: data) {
+                                DispatchQueue.main.async {
+                                    ProfileManager.shared.profileImage = image
+                                }
+                            }
+                        }.resume()
+                    }
+
+                    // 2. Fetch user profile
                     FirebaseManager.shared.fetchUserProfile(uid: uid) { profileData in
                         DispatchQueue.main.async {
                             if let data = profileData {
                                 let firstName = data["firstName"] as? String ?? ""
                                 let lastName = data["lastName"] as? String ?? ""
                                 if !firstName.isEmpty {
-                                    UserDefaults.standard.set(firstName, forKey: "user_first_name")
+                                    ProfileManager.shared.firstName = firstName
                                 }
                                 if !lastName.isEmpty {
-                                    UserDefaults.standard.set(lastName, forKey: "user_last_name")
+                                    ProfileManager.shared.lastName = lastName
                                 }
                             } else {
-                                // Fallback to email prefix if profile data is not available
-                                let emailPrefix = email.components(separatedBy: "@").first ?? ""
-                                let firstName = emailPrefix.components(separatedBy: ".").first?.capitalized ?? emailPrefix
-                                if !firstName.isEmpty {
-                                    UserDefaults.standard.set(firstName, forKey: "user_first_name")
+                                // Fallback to email prefix if profile data is not available and displayName was empty
+                                if ProfileManager.shared.firstName.isEmpty {
+                                    let emailPrefix = email.components(separatedBy: "@").first ?? ""
+                                    let firstName = emailPrefix.components(separatedBy: ".").first?.capitalized ?? emailPrefix
+                                    if !firstName.isEmpty {
+                                        ProfileManager.shared.firstName = firstName
+                                    }
                                 }
                             }
 

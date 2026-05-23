@@ -356,6 +356,10 @@ class GroupNewViewController: UIViewController, UICollectionViewDelegate, UIColl
             // 2. Setup the actual room path
             firebase.setupSession(hostUID: hostID, conversationID: currentSessionID, isHost: isHost)
 
+        setupFirebaseObservers()
+    }
+
+    private func setupFirebaseObservers() {
         firebase.observeSessionStatus { [weak self] status in
             guard let self = self else { return }
             if status == "ended" {
@@ -366,39 +370,45 @@ class GroupNewViewController: UIViewController, UICollectionViewDelegate, UIColl
         firebase.observeMessages { [weak self] data in
             guard let self = self else { return }
 
-            // Corrected syntax for the if-let block
-            if let text = data["text"] as? String,
-               let sender = data["sender"] as? String,
-               let senderID = data["senderID"] as? String {
+            guard let text = data["text"] as? String,
+                  let sender = data["sender"] as? String,
+                  let senderID = data["senderID"] as? String else { return }
 
-                if senderID == self.currentUserID {
-                    let lastFinalized = self.messages.last(where: {
-                        $0.text != "Listening..." && $0.text != "..." && !$0.isIncoming
-                    })
-                    if let last = lastFinalized, last.text == text {
-                        return
-                    }
-                }
-
-                let isListeningPresent = (self.messages.last?.text == "Listening..." || self.messages.last?.text == "...") && !self.messages.last!.isIncoming
-
-                if isListeningPresent {
-                    self.removeListeningBubble()
-                }
-
-                let msg = GroupNewChatMessage(
-                    text: text,
-                    isIncoming: (senderID != self.currentUserID),
-                    sender: sender,
-                    senderID: senderID
-                )
-                self.messages.append(msg)
-                self.reloadDataAndScroll()
-
-                if isListeningPresent && self.isRecording {
-                    self.addListeningBubble()
+            if senderID == self.currentUserID {
+                let lastFinalized = self.messages.last(where: { !$0.isIncoming && $0.text != "..." && $0.text != "Listening..." })
+                if let last = lastFinalized, last.text == text {
+                    return
                 }
             }
+
+            DispatchQueue.main.async {
+                self.processIncomingMessage(text: text, sender: sender, senderID: senderID)
+            }
+        }
+    }
+
+    private func processIncomingMessage(text: String, sender: String, senderID: String) {
+        if self.messages.contains(where: { $0.text == text && $0.senderID == senderID }) {
+            return
+        }
+
+        let isListeningPresent = (self.messages.last?.text == "Listening..." || self.messages.last?.text == "...") && !self.messages.last!.isIncoming
+
+        if isListeningPresent {
+            self.removeListeningBubble()
+        }
+
+        let msg = GroupNewChatMessage(
+            text: text,
+            isIncoming: (senderID != self.currentUserID),
+            sender: sender,
+            senderID: senderID
+        )
+        self.messages.append(msg)
+        self.reloadDataAndScroll()
+
+        if isListeningPresent && self.isRecording {
+            self.addListeningBubble()
         }
     }
 
