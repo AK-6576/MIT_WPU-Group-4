@@ -1,0 +1,91 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon\r
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.byhost
+.trash
+*.icharwork
+
+# Xcode
+#
+# build/
+# Note: It's recommended to exclude the whole build folder from version control.
+build/
+DerivedData/
+
+# Writing custom schemes to share them is recommended, but user specific schemes should be ignored.
+xcuserdata/
+
+# Private/personal settings
+*.pbxuser
+*.mode1v3
+*.mode2v3
+*.perspectivev3
+
+# Xcode Server/Bots
+# If you are using Xcode Server/Bots, the following folder is created:
+*.xcbot
+
+# Swift Package Manager
+#
+# Add this line if you want to avoid checking in SPM dependency source code:
+.build/
+# Add this line if you want to avoid checking in SPM resolved dependency state:
+# Package.resolved
+
+# CocoaPods
+#
+# We recommend against adding the Pods directory to your .gitignore. However,
+# if you choose to do so, uncomment the line below.
+# Pods/
+#
+# If you are using CocoaPods, it is recommended to ignore the local Pods environment and spec cache:
+# Session.vim
+.cocoapods/
+
+# Carthage
+#
+# We recommend against adding the Carthage/Build directory to your .gitignore.
+# Carthage/Build/
+
+# Accidental files from IDEs, editors or workspace states
+.cursorstate
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+*~
+*.orig
+
+# Environment variables
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+.env.*.local
+*.env
+*.env.*
+
+# Fastlane
+#
+# It is recommended to not store the screenshots in the git repo.
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/**/*.png
+fastlane/test_output
+
+# Code Coverage
+*.gcno
+*.gcda
+*.gcov
