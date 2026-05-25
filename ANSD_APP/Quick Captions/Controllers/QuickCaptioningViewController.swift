@@ -33,7 +33,7 @@ class QuickCaptioningViewController: UIViewController,
     private var holdTimer: Timer?
 
     let locationManager = CLLocationManager()
-    var currentLocationString: String = "Location Unknown"
+    var currentLocationString: String = "Locating..."
 
     private let audioEngine = AVAudioEngine()
     private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
@@ -711,7 +711,7 @@ class QuickCaptioningViewController: UIViewController,
                             participants[idx] = QuickCaptionsParticipantData(
                                 name: msg.sender,
                                 senderID: sid,
-                                summary: "Waiting for analysis..."
+                                summary: "Analysing..."
                             )
                         } else {
                             seenIDs[sid] = participants.count
@@ -719,7 +719,7 @@ class QuickCaptioningViewController: UIViewController,
                             participants.append(QuickCaptionsParticipantData(
                                 name: msg.sender,
                                 senderID: sid,
-                                summary: "Waiting for analysis..."
+                                summary: "Analysing..."
                             ))
                         }
                     }

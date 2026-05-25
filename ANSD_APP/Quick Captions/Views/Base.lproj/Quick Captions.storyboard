@@ -274,7 +274,7 @@
                                                                             <nil key="textColor" />
                                                                             <nil key="highlightedColor" />
                                                                         </label>
-                                                                        <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="249" verticalHuggingPriority="251" text="October 4th, 2026" textAlignment="right" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="hbd-1Y-y0E">
+                                                                        <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="249" verticalHuggingPriority="251" text="" textAlignment="right" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="hbd-1Y-y0E">
                                                                             <rect key="frame" x="74.333333333333343" y="12.333333333333336" width="262.66666666666663" height="19.333333333333332" />
                                                                             <fontDescription key="fontDescription" type="system" pointSize="16" />
                                                                             <color key="textColor" systemColor="secondaryLabelColor" />
@@ -309,7 +309,7 @@
                                                                             <nil key="textColor" />
                                                                             <nil key="highlightedColor" />
                                                                         </label>
-                                                                        <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="249" verticalHuggingPriority="251" text="03:10 PM - 03:18 PM" textAlignment="right" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="Igu-pL-xen">
+                                                                        <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="249" verticalHuggingPriority="251" text="" textAlignment="right" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="Igu-pL-xen">
                                                                             <rect key="frame" x="75.666666666666657" y="12.333333333333329" width="261.33333333333337" height="19.333333333333332" />
                                                                             <fontDescription key="fontDescription" type="system" pointSize="16" />
                                                                             <color key="textColor" systemColor="secondaryLabelColor" />
@@ -482,7 +482,7 @@
                                                                 </userDefinedRuntimeAttribute>
                                                             </userDefinedRuntimeAttributes>
                                                         </view>
-                                                        <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="Participant summary text goes here..." textAlignment="natural" lineBreakMode="wordWrap" numberOfLines="0" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="TQh-jl-HP2">
+                                                        <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="" textAlignment="natural" lineBreakMode="wordWrap" numberOfLines="0" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="TQh-jl-HP2">
                                                             <rect key="frame" x="64" y="16" width="285" height="18" />
                                                             <fontDescription key="fontDescription" type="system" pointSize="15" />
                                                             <nil key="textColor" />

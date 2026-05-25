@@ -558,7 +558,7 @@
                                                 <constraint firstAttribute="height" constant="20" id="ans-ui-0006" />
                                               </constraints>
                                             </imageView>
-                                            <textField opaque="NO" contentMode="scaleToFill" contentHorizontalAlignment="left" contentVerticalAlignment="center" text="Session Title" placeholder="Session Title" minimumFontSize="17" translatesAutoresizingMaskIntoConstraints="NO" id="ans-ui-0007">
+                                            <textField opaque="NO" contentMode="scaleToFill" contentHorizontalAlignment="left" contentVerticalAlignment="center" text="" placeholder="Session Title" minimumFontSize="17" translatesAutoresizingMaskIntoConstraints="NO" id="ans-ui-0007">
                                               <rect key="frame" x="30" y="0.0" width="291" height="24" />
                                               <fontDescription key="fontDescription" type="boldSystem" pointSize="17" />
                                               <textInputTraits key="textInputTraits" />

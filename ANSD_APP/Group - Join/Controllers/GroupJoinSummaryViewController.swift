@@ -9,9 +9,8 @@
 import UIKit
 import PDFKit
 import FoundationModels
-import FirebaseAuth // Apple Intelligence
+import FirebaseAuth
 import CoreLocation
-import MapKit
 
 class GroupJoinSummaryViewController: UIViewController, UITableViewDelegate, UITableViewDataSource, GroupJoinNotesCardCellDelegate, CLLocationManagerDelegate {
 
@@ -20,14 +19,11 @@ class GroupJoinSummaryViewController: UIViewController, UITableViewDelegate, UIT
 
     var conversationTitle = "Session Summary"
     var transcriptMessages: [GroupJoinChatMessage] = []
-
-    // Using the correct data model for group join participants.
     var participantsData: [GroupJoinParticipants] = []
 
-    // State variables for session metadata displayed on the summary card.
     var dateString: String = ""
     var timeString: String = ""
-    var locationString: String = "Location Unknown"
+    var locationString: String = "Locating..."
 
     private let model = SystemLanguageModel.default
     private var isProcessing = false
@@ -62,14 +58,11 @@ class GroupJoinSummaryViewController: UIViewController, UITableViewDelegate, UIT
     @IBAction func doneButtonTapped(_ sender: Any) {
         self.view.endEditing(true)
         self.saveSessionToHistory()
-        // Returns to the Home storyboard after saving the session to history.
         let storyboard = UIStoryboard(name: "Home", bundle: nil)
         let homeVC = storyboard.instantiateViewController(withIdentifier: "Home")
-
         let navController = UINavigationController(rootViewController: homeVC)
         navController.isNavigationBarHidden = false
         navController.modalPresentationStyle = .fullScreen
-
         if let window = self.view.window {
             UIView.transition(with: window, duration: 0.3, options: .transitionCrossDissolve, animations: {
                 window.rootViewController = navController
@@ -82,10 +75,10 @@ class GroupJoinSummaryViewController: UIViewController, UITableViewDelegate, UIT
         shareAsPDF()
     }
 
-    // MARK: - Logic
+    // MARK: - Data Preparation
     private func prepareParticipantsFromMessages() {
         let placeholders: Set<String> = ["system", "listening...", "identifying…", "identifying..."]
-        var seenIDs = [String: Int]() // senderID -> index
+        var seenIDs = [String: Int]()
         var result = [GroupJoinParticipants]()
 
         for msg in transcriptMessages {
@@ -96,10 +89,10 @@ class GroupJoinSummaryViewController: UIViewController, UITableViewDelegate, UIT
             let key = msg.senderID.isEmpty ? lowerName : msg.senderID
 
             if let idx = seenIDs[key] {
-                result[idx] = GroupJoinParticipants(name: trimmedName, senderID: msg.senderID, summary: "Waiting for analysis...", avatarTitle: "")
+                result[idx] = GroupJoinParticipants(name: trimmedName, senderID: msg.senderID, summary: "Analysing...", avatarTitle: "")
             } else {
                 seenIDs[key] = result.count
-                result.append(GroupJoinParticipants(name: trimmedName, senderID: msg.senderID, summary: "Waiting for analysis...", avatarTitle: ""))
+                result.append(GroupJoinParticipants(name: trimmedName, senderID: msg.senderID, summary: "Analysing...", avatarTitle: ""))
             }
         }
 
@@ -107,9 +100,10 @@ class GroupJoinSummaryViewController: UIViewController, UITableViewDelegate, UIT
         GroupJoinTableView.reloadData()
     }
 
+    // MARK: - AI Summary
     private func generateAISummary() {
         guard !transcriptMessages.isEmpty else {
-            notesText = "No transcript."
+            notesText = "No transcript available."
             GroupJoinTableView.reloadData()
             return
         }
@@ -142,7 +136,7 @@ class GroupJoinSummaryViewController: UIViewController, UITableViewDelegate, UIT
                 TRANSCRIPT:
                 \(text)
                 """
-                // Trigger AI text cleanup for a finalized speech bubble.
+
                 let session = LanguageModelSession(model: model, instructions: instructions)
                 let response = try await session.respond(to: prompt)
 
@@ -153,7 +147,13 @@ class GroupJoinSummaryViewController: UIViewController, UITableViewDelegate, UIT
                 }
             } catch {
                 await MainActor.run {
-                    self.notesText = "Error: \(error.localizedDescription)"
+                    self.notesText = "Summary unavailable."
+                    // Mark any still-pending participants
+                    for i in self.participantsData.indices {
+                        if self.participantsData[i].summary == "Analysing..." {
+                            self.participantsData[i].summary = "Summary unavailable."
+                        }
+                    }
                     self.isProcessing = false
                     self.GroupJoinTableView.reloadData()
                 }
@@ -168,7 +168,10 @@ class GroupJoinSummaryViewController: UIViewController, UITableViewDelegate, UIT
         var participantSummaries: [String: String] = [:]
 
         for line in components {
-            if line.contains("NOTES:") { currentSection = "NOTES"; continue }
+            if line.contains("NOTES:") {
+                currentSection = "NOTES"
+                continue
+            }
             if line.contains("SUMMARY_") && line.contains(":") {
                 let start = line.index(line.startIndex, offsetBy: 8)
                 if let end = line.firstIndex(of: ":") {
@@ -177,8 +180,9 @@ class GroupJoinSummaryViewController: UIViewController, UITableViewDelegate, UIT
                     continue
                 }
             }
-
-            if currentSection == "NOTES" { notesBuffer += line + "\n" } else if !currentSection.isEmpty {
+            if currentSection == "NOTES" {
+                notesBuffer += line + "\n"
+            } else if !currentSection.isEmpty {
                 let existing = participantSummaries[currentSection] ?? ""
                 participantSummaries[currentSection] = existing + line + " "
             }
@@ -188,21 +192,35 @@ class GroupJoinSummaryViewController: UIViewController, UITableViewDelegate, UIT
         if self.notesText.isEmpty { self.notesText = text }
 
         for (name, summary) in participantSummaries {
-            if let index = participantsData.firstIndex(where: { name.localizedCaseInsensitiveContains($0.name) || $0.name.localizedCaseInsensitiveContains(name) }) {
+            let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+            if let index = participantsData.firstIndex(where: {
+                trimmedName.localizedCaseInsensitiveContains($0.name.trimmingCharacters(in: .whitespacesAndNewlines)) ||
+                $0.name.trimmingCharacters(in: .whitespacesAndNewlines).localizedCaseInsensitiveContains(trimmedName)
+            }) {
                 var cleanSummary = summary.trimmingCharacters(in: .whitespacesAndNewlines)
                 if cleanSummary.hasPrefix("-") || cleanSummary.hasPrefix("•") {
                     cleanSummary.removeFirst()
                     cleanSummary = cleanSummary.trimmingCharacters(in: .whitespacesAndNewlines)
                 }
-                participantsData[index].summary = cleanSummary
+                if !cleanSummary.isEmpty {
+                    participantsData[index].summary = cleanSummary
+                }
+            }
+        }
+
+        // Replace any remaining placeholder with a clear fallback
+        for i in participantsData.indices {
+            if participantsData[i].summary == "Analysing..." {
+                participantsData[i].summary = "No summary available."
             }
         }
     }
 
     // MARK: - TableView
     func numberOfSections(in tableView: UITableView) -> Int { 6 }
+
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        section == 3 ? participantsData.count : 1
+        section == 3 ? max(participantsData.count, 1) : 1
     }
 
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
@@ -214,23 +232,29 @@ class GroupJoinSummaryViewController: UIViewController, UITableViewDelegate, UIT
             cell.selectionStyle = .none
             return cell
 
-        case 1: // Main Card
+        case 1:
             guard let cell = tableView.dequeueReusableCell(withIdentifier: "GroupJoinSummaryCardCell", for: indexPath) as? GroupJoinSummaryCardCell else { return UITableViewCell() }
             cell.configure(title: conversationTitle, date: dateString, time: timeString, location: locationString)
             cell.selectionStyle = .none
             return cell
 
-        case 2: // Header Participants
+        case 2:
             guard let cell = tableView.dequeueReusableCell(withIdentifier: "GroupJoinSummarySectionHeaderCell", for: indexPath) as? GroupJoinSummarySectionHeaderCell else { return UITableViewCell() }
             cell.headerLabel.text = "Participants Summary"
             cell.headerIcon.image = UIImage(systemName: "person.2.fill")
             cell.selectionStyle = .none
             return cell
 
-        case 3: // LIST OF PARTICIPANTS (Using Card Cell)
+        case 3:
+            guard !participantsData.isEmpty else {
+                let cell = UITableViewCell()
+                cell.textLabel?.text = "No participants detected."
+                cell.textLabel?.textColor = .secondaryLabel
+                cell.selectionStyle = .none
+                return cell
+            }
             guard let cell = tableView.dequeueReusableCell(withIdentifier: "GroupJoinParticipantsCardCell", for: indexPath) as? GroupJoinParticipantsCardCell else { return UITableViewCell() }
-            let data = participantsData[indexPath.row]
-            cell.configure(with: data)
+            cell.configure(with: participantsData[indexPath.row])
             cell.selectionStyle = .none
             return cell
 
@@ -241,23 +265,26 @@ class GroupJoinSummaryViewController: UIViewController, UITableViewDelegate, UIT
             cell.selectionStyle = .none
             return cell
 
-        case 5: // Notes Card
+        case 5:
             guard let cell = tableView.dequeueReusableCell(withIdentifier: "GroupJoinNotesCardCell", for: indexPath) as? GroupJoinNotesCardCell else { return UITableViewCell() }
             cell.notesTextView.text = self.notesText
             cell.delegate = self
             cell.selectionStyle = .none
             return cell
 
-        default: return UITableViewCell()
+        default:
+            return UITableViewCell()
         }
     }
 
-    // MARK: - Helpers (Date, Location, PDF)
+    // MARK: - Date & Location
     private func generateDateAndTime() {
         let now = Date()
         let dateFormatter = DateFormatter()
         dateFormatter.dateStyle = .medium
+        dateFormatter.timeStyle = .none
         dateString = dateFormatter.string(from: now)
+
         let timeFormatter = DateFormatter()
         timeFormatter.dateStyle = .none
         timeFormatter.timeStyle = .short
@@ -272,41 +299,52 @@ class GroupJoinSummaryViewController: UIViewController, UITableViewDelegate, UIT
 
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         guard let location = locations.last else { return }
+        locationManager.stopUpdatingLocation()
 
-        if let request = MKReverseGeocodingRequest(location: location) {
-            request.getMapItems { mapItems, _ in
-                if let place = mapItems?.first {
-                    self.locationString = [place.addressRepresentations?.cityName, place.addressRepresentations?.regionName].compactMap { $0 }.joined(separator: ", ")
-                    self.locationManager.stopUpdatingLocation()
-                    DispatchQueue.main.async {
-                        self.GroupJoinTableView.reloadSections(IndexSet(integer: 1), with: .none)
-                    }
-                }
+        CLGeocoder().reverseGeocodeLocation(location) { [weak self] placemarks, error in
+            guard let self = self, error == nil, let place = placemarks?.first else {
+                DispatchQueue.main.async { self?.locationString = "Location unavailable" }
+                return
+            }
+            let city = place.locality ?? place.subAdministrativeArea ?? ""
+            let region = place.administrativeArea ?? ""
+            let parts = [city, region].filter { !$0.isEmpty }
+            let resolved = parts.isEmpty ? "Location unavailable" : parts.joined(separator: ", ")
+            DispatchQueue.main.async {
+                self.locationString = resolved
+                self.GroupJoinTableView.reloadSections(IndexSet(integer: 1), with: .none)
             }
         }
     }
 
+    func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+        locationString = "Location unavailable"
+        DispatchQueue.main.async {
+            self.GroupJoinTableView.reloadSections(IndexSet(integer: 1), with: .none)
+        }
+    }
+
+    // MARK: - PDF Share
     private func shareAsPDF() {
         let pdfMetaData = [kCGPDFContextCreator: "Sāmwaad", kCGPDFContextTitle: conversationTitle]
         let format = UIGraphicsPDFRendererFormat()
         format.documentInfo = pdfMetaData as [String: Any]
         let renderer = UIGraphicsPDFRenderer(bounds: CGRect(x: 0, y: 0, width: 595.2, height: 841.8), format: format)
 
-        let data = renderer.pdfData { (context) in
+        let data = renderer.pdfData { context in
             context.beginPage()
-            let titleAttr = [NSAttributedString.Key.font: UIFont.boldSystemFont(ofSize: 24)]
-            let bodyAttr = [NSAttributedString.Key.font: UIFont.systemFont(ofSize: 12)]
+            let titleAttr: [NSAttributedString.Key: Any] = [.font: UIFont.boldSystemFont(ofSize: 24)]
+            let bodyAttr: [NSAttributedString.Key: Any] = [.font: UIFont.systemFont(ofSize: 12)]
 
             conversationTitle.draw(at: CGPoint(x: 40, y: 40), withAttributes: titleAttr)
 
-            var text = "Date: \(dateString) | \(timeString)\nLocation: \(locationString)\n\n"
-            text += "--- NOTES ---\n\(notesText)\n\n"
-            text += "--- PARTICIPANTS ---\n"
+            var body = "Date: \(dateString) | \(timeString)\nLocation: \(locationString)\n\n"
+            body += "--- NOTES ---\n\(notesText)\n\n"
+            body += "--- PARTICIPANTS ---\n"
             for p in participantsData {
-                text += "\(p.name):\n\(p.summary)\n\n"
+                body += "\(p.name):\n\(p.summary)\n\n"
             }
-
-            text.draw(in: CGRect(x: 40, y: 80, width: 515, height: 740), withAttributes: bodyAttr)
+            body.draw(in: CGRect(x: 40, y: 80, width: 515, height: 740), withAttributes: bodyAttr)
         }
 
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("SessionSummary.pdf")
@@ -319,6 +357,7 @@ class GroupJoinSummaryViewController: UIViewController, UITableViewDelegate, UIT
         present(vc, animated: true)
     }
 
+    // MARK: - Delegate
     func didUpdateText(in cell: GroupJoinNotesCardCell) {
         notesText = cell.notesTextView.text
         GroupJoinTableView.performBatchUpdates(nil)
@@ -326,21 +365,21 @@ class GroupJoinSummaryViewController: UIViewController, UITableViewDelegate, UIT
             GroupJoinTableView.scrollToRow(at: indexPath, at: .bottom, animated: false)
         }
     }
-    func didChangeTitle(text: String) { conversationTitle = text }
+
+    func didChangeTitle(text: String) {
+        conversationTitle = text
+    }
 
     // MARK: - Save to History
     private func saveSessionToHistory() {
-        // SAFETY: If time or date is empty, generate it now
         if dateString.isEmpty || timeString.isEmpty {
             generateDateAndTime()
         }
 
-        // Converts participant data to the history-compatible Participant model.
-        let historyParticipants: [Participant] = participantsData.map { person in
-            Participant(name: person.name, summary: person.summary, image: "person.circle.fill")
+        let historyParticipants: [Participant] = participantsData.map {
+            Participant(name: $0.name, summary: $0.summary, image: "person.circle.fill")
         }
 
-        // Maps transcript messages to the generic Message model for history storage.
         let historyMessages: [Message] = transcriptMessages.map { msg in
             Message(
                 id: UUID(),
@@ -354,35 +393,30 @@ class GroupJoinSummaryViewController: UIViewController, UITableViewDelegate, UIT
             )
         }
 
-        // Falls back to a default message if the AI summary is not yet available.
-        let finalNotes = self.notesText == "Generating summary..." ? "No notes generated." : self.notesText
+        let finalNotes = (notesText == "Generating summary..." || notesText == "Analysing...") ? "No notes generated." : notesText
         let cleanOneLiner = finalNotes.replacingOccurrences(of: "\n", with: " ")
 
-        // Packages the full session data into a Conversation object for persistent storage.
         let newConversation = Conversation(
             id: UUID().uuidString,
-            title: self.conversationTitle,
-            details: cleanOneLiner,     // Matches 'details' in ConversationDataModels.swift
-            date: self.dateString,
-            startTime: self.timeString,
-            endTime: self.timeString,
-            location: self.locationString,
+            title: conversationTitle,
+            details: cleanOneLiner,
+            date: dateString,
+            startTime: timeString,
+            endTime: timeString,
+            location: locationString,
             category: "Group-Join",
             icon: "person.bubble",
-            info: nil,                  // Matches 'info' in @Model
-            calendarDate: Date(),          // Matches 'calendarDate' in @Model
-            notes: finalNotes,          // Matches 'notes' in @Model
-            isPinned: false,            // Matches 'isPinned' in @Model
+            info: nil,
+            calendarDate: Date(),
+            notes: finalNotes,
+            isPinned: false,
             ownerUID: Auth.auth().currentUser?.uid ?? "",
-            participants: historyParticipants, // Matches relationship
-            messages: historyMessages          // Matches relationship
+            participants: historyParticipants,
+            messages: historyMessages
         )
-        // 5. Send to DataManager to permanently save!
+
         DataManager.shared.addConversation(newConversation)
-
-        // 6. Sync full transcript to Firebase for persistent history
         FirebaseManager.shared.saveFullConversation(newConversation)
-
-        print("Success: Saved Group Join session \(self.conversationTitle) to History!")
+        print("Success: Saved Group Join session \(conversationTitle) to History!")
     }
 }

@@ -248,7 +248,7 @@ class ChatHistoryViewController: UIViewController {
                 result[idx].name = trimmedName
             } else {
                 seenIDs[key] = result.count
-                result.append(Participant(name: trimmedName, summary: "Waiting for analysis...", image: "person.circle.fill"))
+                result.append(Participant(name: trimmedName, summary: "Analysing...", image: "person.circle.fill"))
             }
         }
 
@@ -298,7 +298,12 @@ class ChatHistoryViewController: UIViewController {
 
             } catch {
                 await MainActor.run {
-                    self.generatedNotesText = "Could not generate summary. Error: \(error.localizedDescription)"
+                    self.generatedNotesText = "Summary unavailable."
+                    for i in self.participantsData.indices {
+                        if self.participantsData[i].summary == "Analysing..." {
+                            self.participantsData[i].summary = "Summary unavailable."
+                        }
+                    }
                     self.isProcessing = false
                     self.tableView.reloadData()
                 }
@@ -337,10 +342,25 @@ class ChatHistoryViewController: UIViewController {
         self.histconversationData?.notes = self.generatedNotesText
 
         for (name, summary) in participantSummaries {
-            if let index = participantsData.firstIndex(where: { name.contains($0.name) || $0.name.contains(name) }) {
-                participantsData[index].summary = summary.trimmingCharacters(in: .whitespacesAndNewlines)
+            let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+            if let index = participantsData.firstIndex(where: {
+                trimmedName.localizedCaseInsensitiveContains($0.name.trimmingCharacters(in: .whitespacesAndNewlines)) ||
+                $0.name.trimmingCharacters(in: .whitespacesAndNewlines).localizedCaseInsensitiveContains(trimmedName)
+            }) {
+                let cleanSummary = summary.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !cleanSummary.isEmpty {
+                    participantsData[index].summary = cleanSummary
+                }
             }
         }
+
+        // Replace any remaining placeholder with a clear fallback
+        for i in participantsData.indices {
+            if participantsData[i].summary == "Analysing..." || participantsData[i].summary == "Waiting for analysis..." {
+                participantsData[i].summary = "No summary available."
+            }
+        }
+
         self.histconversationData?.participants = self.participantsData
     }
 

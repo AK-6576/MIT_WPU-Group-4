@@ -44,6 +44,10 @@ class GroupJoinViewController: UIViewController, UICollectionViewDelegate, UICol
     var sentMessageIndices = Set<Int>()
     var isSessionEnded = false
 
+    // When true, the next finalize call will actually send the message to Firebase.
+    // Only set to true inside stopRecording() so messages only go out when mic is muted.
+    private var pendingSend = false
+
     // Tracks the character offset into the full cumulative transcript string to extract only new speech.
     var consumedTranscriptOffset = 0
 
@@ -145,7 +149,10 @@ class GroupJoinViewController: UIViewController, UICollectionViewDelegate, UICol
             recognitionTask = nil
         }
 
+        // Reset offset and tracking sets for new recording session
         consumedTranscriptOffset = 0
+        cleanedMessageIndices.removeAll()
+        sentMessageIndices.removeAll()
         addListeningBubble()
 
         let request = SFSpeechAudioBufferRecognitionRequest()
@@ -230,26 +237,19 @@ class GroupJoinViewController: UIViewController, UICollectionViewDelegate, UICol
                                 self.GroupJoinCollectionView.reloadItems(at: [IndexPath(item: lastIndex, section: 0)])
                             }
                         } else {
+                            // JUST APPEND — also schedule a live cleanup pass so the
+                            // bubble shows punctuated text as the user speaks.
                             self.messages[lastIndex].text = combinedText
                             self.GroupJoinCollectionView.reloadItems(at: [IndexPath(item: lastIndex, section: 0)])
                             self.scrollToBottom()
+                            // Live cleanup: updates the bubble visually but won't send
+                            // (pendingSend is false while recording).
+                            self.processTextWithAppleIntelligence(text: combinedText, index: lastIndex)
                         }
 
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in
-                            guard let self = self else { return }
-                            
-                            if let finalIndex = self.messages.lastIndex(where: { !$0.isIncoming }) {
-                                let finalText = self.messages[finalIndex].text
-                                if finalText != "Listening..." && finalText != "..." && !finalText.isEmpty {
-                                    self.processTextWithAppleIntelligence(text: finalText, index: finalIndex)
-                                }
-                            }
-                        }
-                        
-                        if result.isFinal {
-                            self.finalizeCurrentOutgoingMessage()
-                        }
-
+                        // NOTE: We do NOT send here. Sending only happens in stopRecording()
+                        // when the user presses the mic button to mute. This ensures the
+                        // full utterance is captured before transmitting.
                     }
                 }
 
@@ -267,9 +267,9 @@ class GroupJoinViewController: UIViewController, UICollectionViewDelegate, UICol
 
     // MARK: - Apple Intelligence Logic
     private func processTextWithAppleIntelligence(text: String, index: Int) {
-        if cleanedMessageIndices.contains(index) { return }
-        cleanedMessageIndices.insert(index)
-        
+        // Always re-process so the latest (full) text is cleaned and sent.
+        // We remove the cleanedMessageIndices guard that was causing only the
+        // first partial word to be locked in and transmitted.
         cleanupManager.scheduleCleanup(text: text, at: index) { [weak self] cleanedIndex, cleanedText in
             guard let self = self else { return }
             
@@ -283,6 +283,9 @@ class GroupJoinViewController: UIViewController, UICollectionViewDelegate, UICol
     }
     
     private func sendMessageIfNeeded(text: String, index: Int) {
+        // Only send when the user has pressed mic to mute (pendingSend == true).
+        // This prevents partial words from being transmitted mid-speech.
+        guard pendingSend else { return }
         let trimmedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedText.isEmpty,
               trimmedText != "Listening...",
@@ -290,6 +293,9 @@ class GroupJoinViewController: UIViewController, UICollectionViewDelegate, UICol
               !sentMessageIndices.contains(index) else { return }
         
         sentMessageIndices.insert(index)
+        // Reset the flag after the message is committed so the next recording
+        // session starts clean.
+        pendingSend = false
         firebase.send(text: trimmedText, sender: myName, senderID: currentUserID)
     }
     
@@ -300,6 +306,10 @@ class GroupJoinViewController: UIViewController, UICollectionViewDelegate, UICol
 
     private func stopRecording() {
         guard isRecording else { return }
+        // Set pendingSend = true and leave it true. It will be cleared inside
+        // sendMessageIfNeeded after the async AI cleanup completes and the message
+        // is actually dispatched to Firebase.
+        pendingSend = true
         finalizeCurrentOutgoingMessage()
         audioEngine.stop()
         recognitionRequest?.endAudio()

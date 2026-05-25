@@ -11,7 +11,6 @@ import PDFKit
 import FoundationModels
 import FirebaseAuth
 import CoreLocation
-import MapKit
 
 // MARK: - Required Structs for AI JSON Parsing
 struct AISummaryResponse: Codable {
@@ -41,7 +40,7 @@ class BaseSummaryViewController: UIViewController, UITableViewDelegate, UITableV
     var participants: [ParticipantData] = []
     var dateString: String = ""
     var timeString: String = ""
-    var locationString: String = "Location Unknown"
+    var locationString: String = "Locating..."
 
     // MARK: - AI & State Properties
     var transcriptMessages: [ChatMessage] = []
@@ -118,10 +117,10 @@ class BaseSummaryViewController: UIViewController, UITableViewDelegate, UITableV
 
             if let idx = seenIDs[key] {
                 // Update to the latest display name
-                result[idx] = ParticipantData(name: trimmedName, senderID: msg.senderID, summary: "Waiting for analysis...")
+                result[idx] = ParticipantData(name: trimmedName, senderID: msg.senderID, summary: "Analysing...")
             } else {
                 seenIDs[key] = result.count
-                result.append(ParticipantData(name: trimmedName, senderID: msg.senderID, summary: "Waiting for analysis..."))
+                result.append(ParticipantData(name: trimmedName, senderID: msg.senderID, summary: "Analysing..."))
             }
         }
 
@@ -151,18 +150,28 @@ class BaseSummaryViewController: UIViewController, UITableViewDelegate, UITableV
 
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         guard let location = locations.last else { return }
+        locationManager.stopUpdatingLocation()
 
-        if let request = MKReverseGeocodingRequest(location: location) {
-            request.getMapItems { [weak self] mapItems, _ in
-                guard let self = self else { return }
-                if let place = mapItems?.first {
-                    self.locationString = [place.addressRepresentations?.cityName, place.addressRepresentations?.regionName].compactMap { $0 }.joined(separator: ", ")
-                    self.locationManager.stopUpdatingLocation()
-                    DispatchQueue.main.async {
-                        self.tableView.reloadSections(IndexSet(integer: 1), with: .none)
-                    }
-                }
+        CLGeocoder().reverseGeocodeLocation(location) { [weak self] placemarks, error in
+            guard let self = self, error == nil, let place = placemarks?.first else {
+                DispatchQueue.main.async { self?.locationString = "Location unavailable" }
+                return
             }
+            let city = place.locality ?? place.subAdministrativeArea ?? ""
+            let region = place.administrativeArea ?? ""
+            let parts = [city, region].filter { !$0.isEmpty }
+            let resolved = parts.isEmpty ? "Location unavailable" : parts.joined(separator: ", ")
+            DispatchQueue.main.async {
+                self.locationString = resolved
+                self.tableView.reloadSections(IndexSet(integer: 1), with: .none)
+            }
+        }
+    }
+
+    func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+        locationString = "Location unavailable"
+        DispatchQueue.main.async {
+            self.tableView.reloadSections(IndexSet(integer: 1), with: .none)
         }
     }
 
@@ -220,7 +229,12 @@ class BaseSummaryViewController: UIViewController, UITableViewDelegate, UITableV
 
             } catch {
                 await MainActor.run {
-                    self.notesText = "Could not generate summary. Error: \(error.localizedDescription)"
+                    self.notesText = "Summary unavailable."
+                    for i in self.participants.indices {
+                        if self.participants[i].summary == "Analysing..." {
+                            self.participants[i].summary = "Summary unavailable."
+                        }
+                    }
                     self.isProcessing = false
                     self.tableView.reloadData()
                 }
@@ -254,13 +268,26 @@ class BaseSummaryViewController: UIViewController, UITableViewDelegate, UITableV
             self.notesText = decodedSummary.notes
 
             for aiParticipant in decodedSummary.participants {
-                if let index = self.participants.firstIndex(where: { aiParticipant.name.localizedCaseInsensitiveContains($0.name) || $0.name.localizedCaseInsensitiveContains(aiParticipant.name) }) {
+                let trimmedAIName = aiParticipant.name.trimmingCharacters(in: .whitespacesAndNewlines)
+                if let index = self.participants.firstIndex(where: {
+                    trimmedAIName.localizedCaseInsensitiveContains($0.name.trimmingCharacters(in: .whitespacesAndNewlines)) ||
+                    $0.name.trimmingCharacters(in: .whitespacesAndNewlines).localizedCaseInsensitiveContains(trimmedAIName)
+                }) {
                     var cleanSummary = aiParticipant.summary.trimmingCharacters(in: .whitespacesAndNewlines)
                     if cleanSummary.hasPrefix("-") || cleanSummary.hasPrefix("•") {
                         cleanSummary.removeFirst()
                         cleanSummary = cleanSummary.trimmingCharacters(in: .whitespacesAndNewlines)
                     }
-                    self.participants[index].summary = cleanSummary
+                    if !cleanSummary.isEmpty {
+                        self.participants[index].summary = cleanSummary
+                    }
+                }
+            }
+
+            // Replace any remaining placeholder
+            for i in self.participants.indices {
+                if self.participants[i].summary == "Analysing..." || self.participants[i].summary == "Waiting for analysis..." {
+                    self.participants[i].summary = "No summary available."
                 }
             }
 

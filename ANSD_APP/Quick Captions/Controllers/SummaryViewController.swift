@@ -9,9 +9,10 @@
 import UIKit
 import PDFKit
 import FoundationModels
-import FirebaseAuth // Apple Intelligence
+import FirebaseAuth
+import CoreLocation
 
-class SummaryViewController: UIViewController, UITableViewDelegate, UITableViewDataSource, QuickCaptionsNotesCardCellDelegate, QuickCaptionsSummaryCardDelegate {
+class SummaryViewController: UIViewController, UITableViewDelegate, UITableViewDataSource, QuickCaptionsNotesCardCellDelegate, QuickCaptionsSummaryCardDelegate, CLLocationManagerDelegate {
 
     @IBOutlet weak var tableView: UITableView!
     @IBOutlet weak var shareButton: UIBarButtonItem!
@@ -26,12 +27,13 @@ class SummaryViewController: UIViewController, UITableViewDelegate, UITableViewD
     var dateString: String = ""
     var timeString: String = "" // Acts as End Time
     var startTimeString: String = ""
-    var locationString: String = ""
+    var locationString: String = "Locating..."
 
     // MARK: - AI State
     private let model = SystemLanguageModel.default
     private var isProcessing = false
     private var notesContent: String = "Generating summary..."
+    let locationManager = CLLocationManager()
 
     // MARK: - Lifecycle
     override func viewDidLoad() {
@@ -63,6 +65,7 @@ class SummaryViewController: UIViewController, UITableViewDelegate, UITableViewD
         view.addGestureRecognizer(tap)
 
         generateDateAndTime()
+        setupLocation()
         generateAISummary()
     }
 
@@ -77,6 +80,39 @@ class SummaryViewController: UIViewController, UITableViewDelegate, UITableViewD
         timeFormatter.dateStyle = .none
         timeFormatter.timeStyle = .short
         timeString = timeFormatter.string(from: now)
+    }
+
+    private func setupLocation() {
+        locationManager.delegate = self
+        locationManager.requestWhenInUseAuthorization()
+        locationManager.startUpdatingLocation()
+    }
+
+    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+        guard let location = locations.last else { return }
+        locationManager.stopUpdatingLocation()
+
+        CLGeocoder().reverseGeocodeLocation(location) { [weak self] placemarks, error in
+            guard let self = self, error == nil, let place = placemarks?.first else {
+                DispatchQueue.main.async { self?.locationString = "Location unavailable" }
+                return
+            }
+            let city = place.locality ?? place.subAdministrativeArea ?? ""
+            let region = place.administrativeArea ?? ""
+            let parts = [city, region].filter { !$0.isEmpty }
+            let resolved = parts.isEmpty ? "Location unavailable" : parts.joined(separator: ", ")
+            DispatchQueue.main.async {
+                self.locationString = resolved
+                self.tableView.reloadSections(IndexSet(integer: 1), with: .none)
+            }
+        }
+    }
+
+    func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+        locationString = "Location unavailable"
+        DispatchQueue.main.async {
+            self.tableView.reloadSections(IndexSet(integer: 1), with: .none)
+        }
     }
 
     // MARK: - AI Logic
