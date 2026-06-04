@@ -200,32 +200,32 @@ class ActionJoinViewController: UIViewController, UICollectionViewDelegate, UICo
 
         firebase.observeMessages { [weak self] data in
             guard let self = self else { return }
-            guard let text = data["text"] as? String,
+            guard let messageID = data["id"] as? String,
+                  let text = data["text"] as? String,
                   let sender = data["sender"] as? String,
                   let senderID = data["senderID"] as? String else {
-                // print("DEBUG: ActionJoin - Received malformed message data: \(data)")
                 return
             }
 
-            // print("DEBUG: ActionJoin - Received message from \(sender) (\(senderID)): \(text.prefix(30))...")
-
-            // Deduplication
-            if senderID == self.currentUserID {
-                let lastFinalized = self.messages.last(where: { !$0.isIncoming && $0.text != "..." && $0.text != "Listening..." })
-                if let last = lastFinalized, last.text == text {
-                    // print("DEBUG: ActionJoin - Skipping duplicate self-message")
-                    return
-                }
-            }
-
             DispatchQueue.main.async {
-                self.processIncomingMessage(text: text, sender: sender, senderID: senderID)
+                self.processIncomingMessage(messageID: messageID, text: text, sender: sender, senderID: senderID)
             }
         }
     }
 
-    private func processIncomingMessage(text: String, sender: String, senderID: String) {
-        // Deduplication: Check if the message is already in our list (matching text and sender)
+    private func processIncomingMessage(messageID: String, text: String, sender: String, senderID: String) {
+        // If it's a message we sent, or if it already exists, update the text
+        if let index = self.messages.firstIndex(where: { $0.id == messageID }) {
+            if self.messages[index].text != text {
+                self.messages[index].text = text
+                self.messages[index].sender = sender
+                self.collectionView.reloadItems(at: [IndexPath(item: index, section: 0)])
+                self.scrollToBottom()
+            }
+            return
+        }
+
+        // Deduplication: If this exact text and sender already exist under a different ID, ignore
         if messages.contains(where: { $0.text == text && $0.senderID == senderID }) {
             return
         }
@@ -234,7 +234,7 @@ class ActionJoinViewController: UIViewController, UICollectionViewDelegate, UICo
 
         if isListeningPresent { self.removeListeningBubble() }
 
-        let msg = GroupJoinChatMessage(text: text, isIncoming: (senderID != self.currentUserID), sender: sender, senderID: senderID)
+        let msg = GroupJoinChatMessage(id: messageID, text: text, isIncoming: (senderID != self.currentUserID), sender: sender, senderID: senderID)
         self.messages.append(msg)
         self.reloadDataAndScroll()
 
@@ -394,21 +394,26 @@ class ActionJoinViewController: UIViewController, UICollectionViewDelegate, UICo
 
                             self.messages[lastIndex].text = firstPart
                             self.collectionView.reloadItems(at: [IndexPath(item: lastIndex, section: 0)])
+                            self.firebase.sendOrUpdate(messageID: self.messages[lastIndex].id, text: firstPart, sender: self.myName, senderID: self.currentUserID)
                             self.processTextWithAppleIntelligence(text: firstPart, index: lastIndex)
 
                             let newMsg = GroupJoinChatMessage(text: secondPart.isEmpty ? "..." : secondPart, isIncoming: false, sender: self.myName, senderID: self.currentUserID)
                             self.messages.append(newMsg)
                             self.reloadDataAndScroll()
+                            self.firebase.sendOrUpdate(messageID: newMsg.id, text: newMsg.text, sender: self.myName, senderID: self.currentUserID)
                         } else {
                             // No boundary found yet, just append
                             self.messages[lastIndex].text = combinedText
                             self.collectionView.reloadItems(at: [IndexPath(item: lastIndex, section: 0)])
+                            self.firebase.sendOrUpdate(messageID: self.messages[lastIndex].id, text: combinedText, sender: self.myName, senderID: self.currentUserID)
                             self.scrollToBottom()
                         }
                     } else {
                         self.messages[lastIndex].text = combinedText
                         self.collectionView.reloadItems(at: [IndexPath(item: lastIndex, section: 0)])
                         self.scrollToBottom()
+                        self.firebase.sendOrUpdate(messageID: self.messages[lastIndex].id, text: combinedText, sender: self.myName, senderID: self.currentUserID)
+                        self.processTextWithAppleIntelligence(text: combinedText, index: lastIndex)
                     }
 
                     self.cleanupManager.scheduleCleanup(text: "keepalive", at: 0) { _, _ in
@@ -418,10 +423,7 @@ class ActionJoinViewController: UIViewController, UICollectionViewDelegate, UICo
                                 self.processTextWithAppleIntelligence(text: finalText, index: finalIndex)
                             }
                         }
-                        // Silence-based restart removed as per request.
-                        // Bubble persists until manual stop or character limit reached.
                     }
-
                 }
             }
 
@@ -438,9 +440,6 @@ class ActionJoinViewController: UIViewController, UICollectionViewDelegate, UICo
 
     // MARK: - Apple Intelligence Logic
     private func processTextWithAppleIntelligence(text: String, index: Int) {
-        if cleanedMessageIndices.contains(index) { return }
-        cleanedMessageIndices.insert(index)
-
         Task {
             do {
                 let instructions = """
@@ -473,20 +472,28 @@ class ActionJoinViewController: UIViewController, UICollectionViewDelegate, UICo
                     if index < self.messages.count {
                         self.messages[index].text = cleanedText
                         self.collectionView.reloadItems(at: [IndexPath(item: index, section: 0)])
-                        self.firebase.send(text: cleanedText, sender: self.myName, senderID: self.currentUserID)
+                        self.firebase.sendOrUpdate(messageID: self.messages[index].id, text: cleanedText, sender: self.myName, senderID: self.currentUserID)
                     }
                 }
             } catch {
                 await MainActor.run {
-                    self.firebase.send(text: text, sender: self.myName, senderID: self.currentUserID)
+                    if index < self.messages.count {
+                        self.firebase.sendOrUpdate(messageID: self.messages[index].id, text: text, sender: self.myName, senderID: self.currentUserID)
+                    }
                 }
             }
         }
     }
 
+    private func finalizeCurrentOutgoingMessage() {
+        guard let finalIndex = messages.lastIndex(where: { !$0.isIncoming }) else { return }
+        processTextWithAppleIntelligence(text: messages[finalIndex].text, index: finalIndex)
+    }
+
     // MARK: - Handlers
     func stopRecording() {
         guard isRecording else { return }
+        finalizeCurrentOutgoingMessage()
         audioEngine.stop()
         recognitionRequest?.endAudio()
         audioEngine.inputNode.removeTap(onBus: 0)

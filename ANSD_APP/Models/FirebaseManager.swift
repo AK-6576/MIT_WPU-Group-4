@@ -82,12 +82,12 @@ class FirebaseManager {
             return
         }
         
-        // .childAdded pulls all previous history immediately AND stays active for new messages.
-        sessionRef.observe(.childAdded) { snapshot, _ in
+        let handleSnapshot: (DataSnapshot) -> Void = { snapshot in
             guard let value = snapshot.value as? [String: Any] else { return }
             
             DispatchQueue.global(qos: .userInitiated).async {
                 var decryptedValue = value
+                decryptedValue["id"] = snapshot.key
                 
                 // Decrypt PII
                 if let encryptedText = value["text"] as? String {
@@ -102,6 +102,9 @@ class FirebaseManager {
                 }
             }
         }
+        
+        sessionRef.observe(.childAdded, with: handleSnapshot)
+        sessionRef.observe(.childChanged, with: handleSnapshot)
     }
     
     func send(text: String, sender: String, senderID: String) {
@@ -118,6 +121,23 @@ class FirebaseManager {
             
             // This writes to the 'messages' node of whatever room was set in setupSession()
             self?.ref?.child("messages").childByAutoId().setValue(dict)
+        }
+    }
+    
+    func sendOrUpdate(messageID: String, text: String, sender: String, senderID: String) {
+        let safeMessageID = sanitizeKey(messageID)
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            let encryptedText = CryptoHelper.encrypt(text) ?? ""
+            let encryptedSender = CryptoHelper.encrypt(sender) ?? ""
+            
+            let dict: [String: Any] = [
+                "text": encryptedText,
+                "sender": encryptedSender,
+                "senderID": senderID,
+                "timestamp": ServerValue.timestamp()
+            ]
+            
+            self?.ref?.child("messages").child(safeMessageID).setValue(dict)
         }
     }
     

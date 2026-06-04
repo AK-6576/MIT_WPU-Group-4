@@ -182,12 +182,12 @@ class GroupJoinViewController: UIViewController, UICollectionViewDelegate, UICol
             guard let self = self else { return }
 
             Task { @MainActor in
-                    if let result = result {
-                        let fullString = result.bestTranscription.formattedString
-                        
-                        if result.isFinal {
-                            print("Final transcript: \(fullString)")
-                        }
+                if let result = result {
+                    let fullString = result.bestTranscription.formattedString
+                    
+                    if result.isFinal {
+                        print("Final transcript: \(fullString)")
+                    }
 
                     if self.consumedTranscriptOffset > fullString.count {
                         self.consumedTranscriptOffset = 0
@@ -226,15 +226,18 @@ class GroupJoinViewController: UIViewController, UICollectionViewDelegate, UICol
 
                                 self.messages[lastIndex].text = firstPart
                                 self.GroupJoinCollectionView.reloadItems(at: [IndexPath(item: lastIndex, section: 0)])
+                                self.firebase.sendOrUpdate(messageID: self.messages[lastIndex].id, text: firstPart, sender: self.myName, senderID: self.currentUserID)
                                 self.processTextWithAppleIntelligence(text: firstPart, index: lastIndex)
 
                                 let newMsg = GroupJoinChatMessage(text: secondPart.isEmpty ? "..." : secondPart, isIncoming: false, sender: self.myName, senderID: self.currentUserID)
                                 self.messages.append(newMsg)
                                 self.reloadDataAndScroll()
+                                self.firebase.sendOrUpdate(messageID: newMsg.id, text: newMsg.text, sender: self.myName, senderID: self.currentUserID)
                             } else {
                                 // No boundary found yet, just append to current
                                 self.messages[lastIndex].text = combinedText
                                 self.GroupJoinCollectionView.reloadItems(at: [IndexPath(item: lastIndex, section: 0)])
+                                self.firebase.sendOrUpdate(messageID: self.messages[lastIndex].id, text: combinedText, sender: self.myName, senderID: self.currentUserID)
                             }
                         } else {
                             // JUST APPEND — also schedule a live cleanup pass so the
@@ -242,14 +245,9 @@ class GroupJoinViewController: UIViewController, UICollectionViewDelegate, UICol
                             self.messages[lastIndex].text = combinedText
                             self.GroupJoinCollectionView.reloadItems(at: [IndexPath(item: lastIndex, section: 0)])
                             self.scrollToBottom()
-                            // Live cleanup: updates the bubble visually but won't send
-                            // (pendingSend is false while recording).
+                            self.firebase.sendOrUpdate(messageID: self.messages[lastIndex].id, text: combinedText, sender: self.myName, senderID: self.currentUserID)
                             self.processTextWithAppleIntelligence(text: combinedText, index: lastIndex)
                         }
-
-                        // NOTE: We do NOT send here. Sending only happens in stopRecording()
-                        // when the user presses the mic button to mute. This ensures the
-                        // full utterance is captured before transmitting.
                     }
                 }
 
@@ -267,36 +265,15 @@ class GroupJoinViewController: UIViewController, UICollectionViewDelegate, UICol
 
     // MARK: - Apple Intelligence Logic
     private func processTextWithAppleIntelligence(text: String, index: Int) {
-        // Always re-process so the latest (full) text is cleaned and sent.
-        // We remove the cleanedMessageIndices guard that was causing only the
-        // first partial word to be locked in and transmitted.
         cleanupManager.scheduleCleanup(text: text, at: index) { [weak self] cleanedIndex, cleanedText in
             guard let self = self else { return }
             
             if cleanedIndex < self.messages.count {
                 self.messages[cleanedIndex].text = cleanedText
                 self.GroupJoinCollectionView.reloadItems(at: [IndexPath(item: cleanedIndex, section: 0)])
+                self.firebase.sendOrUpdate(messageID: self.messages[cleanedIndex].id, text: cleanedText, sender: self.myName, senderID: self.currentUserID)
             }
-            
-            self.sendMessageIfNeeded(text: cleanedText, index: cleanedIndex)
         }
-    }
-    
-    private func sendMessageIfNeeded(text: String, index: Int) {
-        // Only send when the user has pressed mic to mute (pendingSend == true).
-        // This prevents partial words from being transmitted mid-speech.
-        guard pendingSend else { return }
-        let trimmedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmedText.isEmpty,
-              trimmedText != "Listening...",
-              trimmedText != "...",
-              !sentMessageIndices.contains(index) else { return }
-        
-        sentMessageIndices.insert(index)
-        // Reset the flag after the message is committed so the next recording
-        // session starts clean.
-        pendingSend = false
-        firebase.send(text: trimmedText, sender: myName, senderID: currentUserID)
     }
     
     private func finalizeCurrentOutgoingMessage() {
@@ -306,10 +283,6 @@ class GroupJoinViewController: UIViewController, UICollectionViewDelegate, UICol
 
     private func stopRecording() {
         guard isRecording else { return }
-        // Set pendingSend = true and leave it true. It will be cleared inside
-        // sendMessageIfNeeded after the async AI cleanup completes and the message
-        // is actually dispatched to Firebase.
-        pendingSend = true
         finalizeCurrentOutgoingMessage()
         audioEngine.stop()
         recognitionRequest?.endAudio()
@@ -375,31 +348,35 @@ class GroupJoinViewController: UIViewController, UICollectionViewDelegate, UICol
         }
 
         // Observe Incoming Messages
-        // Firebase Manager's .childAdded will now pull history + new messages
         firebase.observeMessages { [weak self] data in
             guard let self = self else { return }
 
-            guard let text = data["text"] as? String,
+            guard let messageID = data["id"] as? String,
+                  let text = data["text"] as? String,
                   let sender = data["sender"] as? String,
                   let senderID = data["senderID"] as? String else { return }
 
-            // Deduplication: Don't add if we just sent this locally
-            if senderID == self.currentUserID {
-                let lastFinalized = self.messages.last(where: { !$0.isIncoming && $0.text != "..." && $0.text != "Listening..." })
-                if let last = lastFinalized, last.text == text {
-                    return
-                }
-            }
-
             // Update UI on Main Thread
             DispatchQueue.main.async {
-                self.processIncomingMessage(text: text, sender: sender, senderID: senderID)
+                self.processIncomingMessage(messageID: messageID, text: text, sender: sender, senderID: senderID)
             }
         }
     }
 
-    private func processIncomingMessage(text: String, sender: String, senderID: String) {
-        // Deduplication: Check if the message is already in our list (matching text and sender)
+    private func processIncomingMessage(messageID: String, text: String, sender: String, senderID: String) {
+        // If it's a message we sent, or if it already exists, update the text
+        if let index = self.messages.firstIndex(where: { $0.id == messageID }) {
+            // Only update if the text is actually different to avoid redundant reloads
+            if self.messages[index].text != text {
+                self.messages[index].text = text
+                self.messages[index].sender = sender
+                self.GroupJoinCollectionView.reloadItems(at: [IndexPath(item: index, section: 0)])
+                self.scrollToBottom()
+            }
+            return
+        }
+
+        // Deduplication: If this exact text and sender already exist under a different ID, ignore
         if messages.contains(where: { $0.text == text && $0.senderID == senderID }) {
             return
         }
@@ -411,6 +388,7 @@ class GroupJoinViewController: UIViewController, UICollectionViewDelegate, UICol
         }
 
         let msg = GroupJoinChatMessage(
+            id: messageID,
             text: text,
             isIncoming: (senderID != self.currentUserID),
             sender: sender,
