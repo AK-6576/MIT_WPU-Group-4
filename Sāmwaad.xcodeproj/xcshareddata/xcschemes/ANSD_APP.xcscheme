@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Scheme
    LastUpgradeVersion = "2650"
-   version = "1.8">
+   version = "1.7">
    <BuildAction
       parallelizeBuildables = "YES"
       buildImplicitDependencies = "YES"
@@ -16,9 +16,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "02AE994A2ED5711C0079EA2B"
-               BuildableName = "Samwaad.app"
-               BlueprintName = "Samwaad"
-               ReferencedContainer = "container:Samwaad.xcodeproj">
+               BuildableName = "Sa&#x304;mwaad.app"
+               BlueprintName = "Sa&#x304;mwaad"
+               ReferencedContainer = "container:Sa&#x304;mwaad.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -46,9 +46,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "02AE994A2ED5711C0079EA2B"
-            BuildableName = "Samwaad.app"
-            BlueprintName = "Samwaad"
-            ReferencedContainer = "container:Samwaad.xcodeproj">
+            BuildableName = "Sa&#x304;mwaad.app"
+            BlueprintName = "Sa&#x304;mwaad"
+            ReferencedContainer = "container:Sa&#x304;mwaad.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </LaunchAction>
@@ -63,9 +63,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "02AE994A2ED5711C0079EA2B"
-            BuildableName = "Samwaad.app"
-            BlueprintName = "Samwaad"
-            ReferencedContainer = "container:Samwaad.xcodeproj">
+            BuildableName = "Sa&#x304;mwaad.app"
+            BlueprintName = "Sa&#x304;mwaad"
+            ReferencedContainer = "container:Sa&#x304;mwaad.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </ProfileAction>
