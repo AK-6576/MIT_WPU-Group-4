@@ -45,6 +45,7 @@ class ActionJoinViewController: UIViewController, UICollectionViewDelegate, UICo
     var consumedTranscriptOffset = 0
     var cleanedMessageIndices = Set<Int>()
     var isSessionEnded = false
+    var sessionStartTime: Date?
     var myName: String {
         UserDefaults.standard.string(forKey: "user_first_name") ?? UIDevice.current.name
     }
@@ -76,6 +77,8 @@ class ActionJoinViewController: UIViewController, UICollectionViewDelegate, UICo
         setupSpeech()
         setupAudioSession()
         setupParticipantsButton()
+
+        sessionStartTime = Date()
 
         startFirebaseSession()
 
@@ -305,6 +308,8 @@ class ActionJoinViewController: UIViewController, UICollectionViewDelegate, UICo
         summaryVC.transcriptMessages = self.messages.map { msg in
             ChatMessage(text: msg.text, isIncoming: msg.isIncoming, sender: msg.sender, senderID: msg.senderID)
         }
+        summaryVC.sessionStartTime = self.sessionStartTime
+        summaryVC.sessionEndTime = Date()
 
         // 1. Wrap your summaryVC in a new Navigation Controller
         let navController = UINavigationController(rootViewController: summaryVC)

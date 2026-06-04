@@ -42,6 +42,9 @@ class BaseSummaryViewController: UIViewController, UITableViewDelegate, UITableV
     var timeString: String = ""
     var locationString: String = "Locating..."
 
+    var sessionStartTime: Date?
+    var sessionEndTime: Date?
+
     // MARK: - AI & State Properties
     var transcriptMessages: [ChatMessage] = []
     private let model = SystemLanguageModel.default
@@ -130,16 +133,21 @@ class BaseSummaryViewController: UIViewController, UITableViewDelegate, UITableV
 
     // MARK: - Location & Date
     private func generateDateAndTime() {
-        let now = Date()
+        let start = sessionStartTime ?? Date()
+        let end = sessionEndTime ?? Date()
+
         let dateFormatter = DateFormatter()
         dateFormatter.dateStyle = .medium
         dateFormatter.timeStyle = .none
-        dateString = dateFormatter.string(from: now)
+        dateString = dateFormatter.string(from: start)
 
         let timeFormatter = DateFormatter()
         timeFormatter.dateStyle = .none
         timeFormatter.timeStyle = .short
-        timeString = timeFormatter.string(from: now)
+
+        let startStr = timeFormatter.string(from: start)
+        let endStr = timeFormatter.string(from: end)
+        timeString = "\(startStr) - \(endStr)"
     }
 
     private func setupLocation() {
@@ -426,23 +434,24 @@ class BaseSummaryViewController: UIViewController, UITableViewDelegate, UITableV
         let finalNotes = self.notesText == "Generating summary..." ? "No notes generated." : self.notesText
         let cleanOneLiner = finalNotes.replacingOccurrences(of: "\n", with: " ")
 
-        let now = Date()
-        let endTimeFormatter = DateFormatter()
-        endTimeFormatter.timeStyle = .short
-        let endTimeString = endTimeFormatter.string(from: now)
+        let timeFormatter = DateFormatter()
+        timeFormatter.dateStyle = .none
+        timeFormatter.timeStyle = .short
+        let startStr = timeFormatter.string(from: sessionStartTime ?? Date())
+        let endStr = timeFormatter.string(from: sessionEndTime ?? Date())
 
         let newConversation = Conversation(
             id: UUID().uuidString,
             title: self.conversationTitle,
             details: cleanOneLiner,
             date: self.dateString,
-            startTime: self.timeString,
-            endTime: endTimeString,
+            startTime: startStr,
+            endTime: endStr,
             location: self.locationString,
             category: self.category,
             icon: "bolt.fill",
             info: nil,
-            calendarDate: now,
+            calendarDate: sessionStartTime ?? Date(),
             notes: finalNotes,
             isPinned: false,
             ownerUID: Auth.auth().currentUser?.uid ?? "",

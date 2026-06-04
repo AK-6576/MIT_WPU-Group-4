@@ -43,6 +43,8 @@ class GroupNewViewController: UIViewController, UICollectionViewDelegate, UIColl
         var sentMessageIndices = Set<Int>()
         var currentSessionID: String = ""
 
+        var sessionStartTime: Date?
+
         // When true, the next finalize call will actually send the message to Firebase.
         // Only set to true inside stopRecording() so messages only go out when mic is muted.
         private var pendingSend = false
@@ -73,6 +75,8 @@ class GroupNewViewController: UIViewController, UICollectionViewDelegate, UIColl
                 self.currentSessionID = String(Int.random(in: 1000...9999))
             }
             self.title = "Room: \(currentSessionID)"
+
+            sessionStartTime = Date()
 
             startSession()
 
@@ -330,13 +334,15 @@ class GroupNewViewController: UIViewController, UICollectionViewDelegate, UIColl
     private func startSession() {
         let hostID = currentUserID
 
-        // PRINT THIS: You need this UID to let the other user join your room
-        // print("DEBUG: Host UID is: \(hostID)")
-        // print("DEBUG: Room ID is: \(currentSessionID)")
             firebase.registerRoom(code: currentSessionID, hostUID: hostID)
+            // Register in the global active_rooms list so all devices can see it
+            firebase.registerActiveRoom(code: currentSessionID, displayCode: currentSessionID, hostUID: hostID, hostName: myName)
 
             // 2. Setup the actual room path
             firebase.setupSession(hostUID: hostID, conversationID: currentSessionID, isHost: isHost)
+
+            // Write the initial title so joiners can observe it
+            firebase.setRoomTitle("Room \(currentSessionID)")
 
         setupFirebaseObservers()
     }
@@ -465,11 +471,17 @@ class GroupNewViewController: UIViewController, UICollectionViewDelegate, UIColl
         // 2. Clear UI artifacts
         self.removeListeningBubble()
 
-        // 3. Navigate to Summary
+        // 3. Remove from active rooms list so joiners no longer see it
+        firebase.removeActiveRoom(code: currentSessionID)
+
+        // 4. Navigate to Summary
         let storyboard = UIStoryboard(name: "Group-New", bundle: nil)
         if let summaryVC = storyboard.instantiateViewController(withIdentifier: "GroupNewSummaryViewController") as? GroupNewSummaryViewController {
             summaryVC.transcriptMessages = self.messages
             summaryVC.conversationTitle = "Room \(self.currentSessionID)"
+            summaryVC.roomCode = self.currentSessionID
+            summaryVC.sessionStartTime = self.sessionStartTime
+            summaryVC.sessionEndTime = Date()
 
             let nav = UINavigationController(rootViewController: summaryVC)
             nav.modalPresentationStyle = .pageSheet
@@ -477,7 +489,7 @@ class GroupNewViewController: UIViewController, UICollectionViewDelegate, UIColl
             self.present(nav, animated: true)
         }
 
-        // 4. Cleanup Firebase
+        // 5. Cleanup Firebase
         firebase.stop()
     }
 

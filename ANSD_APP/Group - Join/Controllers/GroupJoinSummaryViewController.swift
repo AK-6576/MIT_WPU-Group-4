@@ -24,6 +24,9 @@ class GroupJoinSummaryViewController: UIViewController, UITableViewDelegate, UIT
     var dateString: String = ""
     var timeString: String = ""
     var locationString: String = "Locating..."
+    
+    var sessionStartTime: Date?
+    var sessionEndTime: Date?
 
     private let model = SystemLanguageModel.default
     private var isProcessing = false
@@ -279,16 +282,21 @@ class GroupJoinSummaryViewController: UIViewController, UITableViewDelegate, UIT
 
     // MARK: - Date & Location
     private func generateDateAndTime() {
-        let now = Date()
+        let start = sessionStartTime ?? Date()
+        let end = sessionEndTime ?? Date()
+
         let dateFormatter = DateFormatter()
         dateFormatter.dateStyle = .medium
         dateFormatter.timeStyle = .none
-        dateString = dateFormatter.string(from: now)
+        dateString = dateFormatter.string(from: start)
 
         let timeFormatter = DateFormatter()
         timeFormatter.dateStyle = .none
         timeFormatter.timeStyle = .short
-        timeString = timeFormatter.string(from: now)
+        
+        let startStr = timeFormatter.string(from: start)
+        let endStr = timeFormatter.string(from: end)
+        timeString = "\(startStr) - \(endStr)"
     }
 
     private func setupLocation() {
@@ -396,18 +404,24 @@ class GroupJoinSummaryViewController: UIViewController, UITableViewDelegate, UIT
         let finalNotes = (notesText == "Generating summary..." || notesText == "Analysing...") ? "No notes generated." : notesText
         let cleanOneLiner = finalNotes.replacingOccurrences(of: "\n", with: " ")
 
+        let timeFormatter = DateFormatter()
+        timeFormatter.dateStyle = .none
+        timeFormatter.timeStyle = .short
+        let startStr = timeFormatter.string(from: sessionStartTime ?? Date())
+        let endStr = timeFormatter.string(from: sessionEndTime ?? Date())
+
         let newConversation = Conversation(
             id: UUID().uuidString,
             title: conversationTitle,
             details: cleanOneLiner,
             date: dateString,
-            startTime: timeString,
-            endTime: timeString,
+            startTime: startStr,
+            endTime: endStr,
             location: locationString,
             category: "Group-Join",
             icon: "person.bubble",
             info: nil,
-            calendarDate: Date(),
+            calendarDate: sessionStartTime ?? Date(),
             notes: finalNotes,
             isPinned: false,
             ownerUID: Auth.auth().currentUser?.uid ?? "",

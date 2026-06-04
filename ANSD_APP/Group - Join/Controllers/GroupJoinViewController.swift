@@ -71,6 +71,8 @@ class GroupJoinViewController: UIViewController, UICollectionViewDelegate, UICol
     // Constant for bubble splitting (Adjust based on your UI)
     private let MAX_BUBBLE_CHAR_LIMIT = 180
 
+    var sessionStartTime: Date?
+
     // MARK: - Lifecycle
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -79,6 +81,8 @@ class GroupJoinViewController: UIViewController, UICollectionViewDelegate, UICol
         setupAudioSession()
 
         self.title = sessionTitle
+
+        sessionStartTime = Date()
 
         NotificationCenter.default.addObserver(self, selector: #selector(handleLanguageChange), name: .languageDidChange, object: nil)
 
@@ -342,9 +346,15 @@ class GroupJoinViewController: UIViewController, UICollectionViewDelegate, UICol
         firebase.observeSessionStatus { [weak self] status in
             guard let self = self else { return }
             if status == "ended" {
-                // print("DEBUG: Session ended signal received.")
                 self.handleGlobalSessionEnd()
             }
+        }
+
+        // Observe the room title — updates nav bar live if host renames the room
+        firebase.observeRoomTitle { [weak self] title in
+            guard let self = self else { return }
+            self.sessionTitle = title
+            self.title = title
         }
 
         // Observe Incoming Messages
@@ -356,7 +366,6 @@ class GroupJoinViewController: UIViewController, UICollectionViewDelegate, UICol
                   let sender = data["sender"] as? String,
                   let senderID = data["senderID"] as? String else { return }
 
-            // Update UI on Main Thread
             DispatchQueue.main.async {
                 self.processIncomingMessage(messageID: messageID, text: text, sender: sender, senderID: senderID)
             }
@@ -448,7 +457,10 @@ class GroupJoinViewController: UIViewController, UICollectionViewDelegate, UICol
             let storyboard = UIStoryboard(name: "Group-Join", bundle: nil)
             if let summaryVC = storyboard.instantiateViewController(withIdentifier: "GroupJoinSummaryViewController") as? GroupJoinSummaryViewController {
                 summaryVC.transcriptMessages = self.messages
+                // sessionTitle is always up-to-date because observeRoomTitle keeps it in sync
                 summaryVC.conversationTitle = self.sessionTitle
+                summaryVC.sessionStartTime = self.sessionStartTime
+                summaryVC.sessionEndTime = Date()
                 let nav = UINavigationController(rootViewController: summaryVC)
                 nav.modalPresentationStyle = .pageSheet
                 nav.isModalInPresentation = true

@@ -72,7 +72,12 @@ class ConversationCollectionViewCell: UICollectionViewCell {
         calendarIcon.tintColor = .secondaryLabel // Increased emphasis slightly
 
         // Slot 2 (Middle): Time Range
-        let timeRangeStr = "\(conversation.startTime) - \(conversation.endTime)"
+        let timeRangeStr: String
+        if !conversation.endTime.isEmpty && conversation.startTime != conversation.endTime {
+            timeRangeStr = "\(conversation.startTime) - \(conversation.endTime)"
+        } else {
+            timeRangeStr = conversation.startTime
+        }
         timeLabel.text = timeRangeStr
         clockIcon.image = UIImage(systemName: "clock")
         clockIcon.tintColor = .secondaryLabel

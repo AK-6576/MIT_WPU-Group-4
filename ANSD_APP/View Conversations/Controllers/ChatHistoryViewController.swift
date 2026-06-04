@@ -627,7 +627,12 @@ extension ChatHistoryViewController: UITableViewDelegate, UITableViewDataSource,
             if let convo = histconversationData {
                 cell.dateLabel.text = convo.date
                 cell.locationLabel.text = convo.location.isEmpty ? "No Location" : convo.location
-                cell.timeLabel.text = convo.startTime
+                // Show range; fall back to single time if start == end (legacy records)
+                if !convo.endTime.isEmpty && convo.startTime != convo.endTime {
+                    cell.timeLabel.text = "\(convo.startTime) - \(convo.endTime)"
+                } else {
+                    cell.timeLabel.text = convo.startTime
+                }
             }
             cell.delegate = self
             return cell

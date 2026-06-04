@@ -20,10 +20,15 @@ class GroupNewSummaryViewController: UIViewController, UITableViewDelegate, UITa
     var conversationTitle = "Session Summary"
     var transcriptMessages: [GroupNewChatMessage] = []
     var participantsData: [GroupNewParticipantData] = []
+    /// Passed from GroupNewViewController so title renames can sync to active_rooms
+    var roomCode: String = ""
 
     var dateString: String = ""
     var timeString: String = ""
     var locationString: String = "Locating..."
+
+    var sessionStartTime: Date?
+    var sessionEndTime: Date?
 
     private let model = SystemLanguageModel.default
     private var isProcessing = false
@@ -206,16 +211,21 @@ class GroupNewSummaryViewController: UIViewController, UITableViewDelegate, UITa
 
     // MARK: - Date & Location
     private func generateDateAndTime() {
-        let now = Date()
+        let start = sessionStartTime ?? Date()
+        let end = sessionEndTime ?? Date()
+
         let dateFormatter = DateFormatter()
         dateFormatter.dateStyle = .medium
         dateFormatter.timeStyle = .none
-        dateString = dateFormatter.string(from: now)
+        dateString = dateFormatter.string(from: start)
 
         let timeFormatter = DateFormatter()
         timeFormatter.dateStyle = .none
         timeFormatter.timeStyle = .short
-        timeString = timeFormatter.string(from: now)
+
+        let startStr = timeFormatter.string(from: start)
+        let endStr = timeFormatter.string(from: end)
+        timeString = "\(startStr) - \(endStr)"
     }
 
     private func setupLocation() {
@@ -379,6 +389,11 @@ class GroupNewSummaryViewController: UIViewController, UITableViewDelegate, UITa
 
     func didChangeTitle(text: String) {
         self.conversationTitle = text
+        // Sync the new title to Firebase so active joiners see it live
+        if !roomCode.isEmpty {
+            FirebaseManager.shared.updateActiveRoomTitle(code: roomCode, title: text)
+            FirebaseManager.shared.setRoomTitle(text)
+        }
     }
 
     // MARK: - Save to History
@@ -407,13 +422,19 @@ class GroupNewSummaryViewController: UIViewController, UITableViewDelegate, UITa
         let finalNotes = (notesText == "Generating summary..." || notesText == "Analysing...") ? "No notes generated." : notesText
         let cleanOneLiner = finalNotes.replacingOccurrences(of: "\n", with: " ")
 
+        let timeFormatter = DateFormatter()
+        timeFormatter.dateStyle = .none
+        timeFormatter.timeStyle = .short
+        let startStr = timeFormatter.string(from: sessionStartTime ?? Date())
+        let endStr = timeFormatter.string(from: sessionEndTime ?? Date())
+
         let newConversation = Conversation(
             id: UUID().uuidString,
             title: conversationTitle,
             details: cleanOneLiner,
             date: dateString,
-            startTime: timeString,
-            endTime: timeString,
+            startTime: startStr,
+            endTime: endStr,
             location: locationString,
             category: "Group-New",
             icon: "square.and.pencil",

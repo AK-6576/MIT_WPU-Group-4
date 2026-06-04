@@ -73,6 +73,90 @@ class FirebaseManager {
             }
         }
     }
+
+    // MARK: - Active Rooms (visible to all devices on the join screen)
+
+    /// Host calls this when starting a session. Writes an entry to the global
+    /// active_rooms node so all joiners can see it in real time.
+    func registerActiveRoom(code: String, displayCode: String, hostUID: String, hostName: String) {
+        let safeCode = CryptoHelper.hashIdentifier(code.uppercased())
+        let encryptedDisplayCode = CryptoHelper.encrypt(displayCode) ?? ""
+        let encryptedTitle = CryptoHelper.encrypt("Room \(displayCode)") ?? ""
+        let encryptedHostUID = CryptoHelper.encrypt(hostUID) ?? ""
+        let encryptedHostName = CryptoHelper.encrypt(hostName) ?? ""
+
+        let data: [String: Any] = [
+            "displayCode": encryptedDisplayCode,
+            "title": encryptedTitle,
+            "hostUID": encryptedHostUID,
+            "hostName": encryptedHostName,
+            "createdAt": ServerValue.timestamp()
+        ]
+        print("[Firebase] Writing active_rooms/\(safeCode) — displayCode: \(displayCode), host: \(hostName)")
+        databaseRef.child("active_rooms").child(safeCode).setValue(data) { error, _ in
+            if let error = error {
+                print("[Firebase] active_rooms write FAILED: \(error.localizedDescription)")
+            } else {
+                print("[Firebase] active_rooms write SUCCESS for room \(displayCode)")
+            }
+        }
+    }
+
+    /// Host calls this when ending a session to remove it from the live list.
+    func removeActiveRoom(code: String) {
+        let safeCode = CryptoHelper.hashIdentifier(code.uppercased())
+        databaseRef.child("active_rooms").child(safeCode).removeValue()
+    }
+
+    /// Anyone can call this to get a live-updating list of all active rooms.
+    /// Returns decoded `[hash: (displayCode, title, hostName)]` via added/removed callbacks.
+    func observeActiveRooms(
+        onAdded: @escaping (_ hash: String, _ displayCode: String, _ title: String, _ hostName: String) -> Void,
+        onRemoved: @escaping (_ hash: String) -> Void
+    ) {
+        databaseRef.child("active_rooms").observe(.childAdded) { snapshot in
+            guard let dict = snapshot.value as? [String: Any] else { return }
+            let hash = snapshot.key
+            let displayCode = CryptoHelper.decryptOrOriginal(dict["displayCode"] as? String ?? "")
+            let title = CryptoHelper.decryptOrOriginal(dict["title"] as? String ?? "")
+            let hostName = CryptoHelper.decryptOrOriginal(dict["hostName"] as? String ?? "")
+            DispatchQueue.main.async { onAdded(hash, displayCode, title, hostName) }
+        }
+        databaseRef.child("active_rooms").observe(.childRemoved) { snapshot in
+            let hash = snapshot.key
+            DispatchQueue.main.async { onRemoved(hash) }
+        }
+    }
+
+    /// Stops observing the active_rooms node (call from viewWillDisappear).
+    func stopObservingActiveRooms() {
+        databaseRef.child("active_rooms").removeAllObservers()
+    }
+
+    /// Host writes/updates the human-readable title for the room so joiners
+    /// can observe it in real time (e.g. if host renames in summary screen).
+    func setRoomTitle(_ title: String) {
+        let encryptedTitle = CryptoHelper.encrypt(title) ?? ""
+        ref?.child("title").setValue(encryptedTitle)
+    }
+
+    /// Host updates active_rooms title when they rename the session.
+    func updateActiveRoomTitle(code: String, title: String) {
+        let safeCode = CryptoHelper.hashIdentifier(code.uppercased())
+        let encryptedTitle = CryptoHelper.encrypt(title) ?? ""
+        databaseRef.child("active_rooms").child(safeCode).child("title").setValue(encryptedTitle)
+    }
+
+    /// Joiner observes the room title node so they get live renames from the host.
+    func observeRoomTitle(completion: @escaping (String) -> Void) {
+        ref?.child("title").observe(.value) { snapshot in
+            guard let encrypted = snapshot.value as? String else { return }
+            let title = CryptoHelper.decryptOrOriginal(encrypted)
+            if !title.isEmpty {
+                DispatchQueue.main.async { completion(title) }
+            }
+        }
+    }
     
     // MARK: - Message Handling
     
