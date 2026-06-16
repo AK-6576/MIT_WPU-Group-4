@@ -36,8 +36,19 @@
 		BFDA3C9D2F40735600445EC1 /* FirebaseStorageCombine-Community in Frameworks */ = {isa = PBXBuildFile; productRef = BFDA3C9C2F40735600445EC1 /* FirebaseStorageCombine-Community */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		4048257E2FE172740064219F /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 02AE99432ED5711C0079EA2B /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 02AE994A2ED5711C0079EA2B;
+			remoteInfo = "Sāmwaad";
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
 		02AE994B2ED5711C0079EA2B /* Sāmwaad.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Sāmwaad.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		404825782FE172740064219F /* SāmwaadUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "SāmwaadUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		BF1B1AAE2F4070EF00C4F236 /* VL1004.mlpackage */ = {isa = PBXFileReference; lastKnownFileType = folder.mlpackage; path = VL1004.mlpackage; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -58,6 +69,11 @@
 				02AE995D2ED5711D0079EA2B /* Exceptions for "ANSD_APP" folder in "Sāmwaad" target */,
 			);
 			path = ANSD_APP;
+			sourceTree = "<group>";
+		};
+		404825792FE172740064219F /* SāmwaadUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "SāmwaadUITests";
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -96,6 +112,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		404825752FE172740064219F /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -103,6 +126,7 @@
 			isa = PBXGroup;
 			children = (
 				02AE994D2ED5711C0079EA2B /* ANSD_APP */,
+				404825792FE172740064219F /* SāmwaadUITests */,
 				02AE994C2ED5711C0079EA2B /* Products */,
 				BF1B1AAE2F4070EF00C4F236 /* VL1004.mlpackage */,
 				BFDA3C6C2F40729100445EC1 /* Frameworks */,
@@ -113,6 +137,7 @@
 			isa = PBXGroup;
 			children = (
 				02AE994B2ED5711C0079EA2B /* Sāmwaad.app */,
+				404825782FE172740064219F /* SāmwaadUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -175,6 +200,29 @@
 			productReference = 02AE994B2ED5711C0079EA2B /* Sāmwaad.app */;
 			productType = "com.apple.product-type.application";
 		};
+		404825772FE172740064219F /* SāmwaadUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 404825822FE172740064219F /* Build configuration list for PBXNativeTarget "SāmwaadUITests" */;
+			buildPhases = (
+				404825742FE172740064219F /* Sources */,
+				404825752FE172740064219F /* Frameworks */,
+				404825762FE172740064219F /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				4048257F2FE172740064219F /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				404825792FE172740064219F /* SāmwaadUITests */,
+			);
+			name = "SāmwaadUITests";
+			packageProductDependencies = (
+			);
+			productName = "SāmwaadUITests";
+			productReference = 404825782FE172740064219F /* SāmwaadUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -182,11 +230,15 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
-				LastSwiftUpdateCheck = 2610;
+				LastSwiftUpdateCheck = 2650;
 				LastUpgradeCheck = 2630;
 				TargetAttributes = {
 					02AE994A2ED5711C0079EA2B = {
 						CreatedOnToolsVersion = 26.1.1;
+					};
+					404825772FE172740064219F = {
+						CreatedOnToolsVersion = 26.5;
+						TestTargetID = 02AE994A2ED5711C0079EA2B;
 					};
 				};
 			};
@@ -210,12 +262,20 @@
 			projectRoot = "";
 			targets = (
 				02AE994A2ED5711C0079EA2B /* Sāmwaad */,
+				404825772FE172740064219F /* SāmwaadUITests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		02AE99492ED5711C0079EA2B /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		404825762FE172740064219F /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -233,7 +293,22 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		404825742FE172740064219F /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		4048257F2FE172740064219F /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 02AE994A2ED5711C0079EA2B /* Sāmwaad */;
+			targetProxy = 4048257E2FE172740064219F /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		02AE995F2ED5711D0079EA2B /* Debug */ = {
@@ -263,6 +338,7 @@
 				);
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.group4.Samwaad;
+				PRODUCT_MODULE_NAME = Samwaad;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -301,6 +377,7 @@
 				);
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.group4.Samwaad;
+				PRODUCT_MODULE_NAME = Samwaad;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -437,6 +514,48 @@
 			};
 			name = Release;
 		};
+		404825802FE172740064219F /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = PUMDFHHYD3;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.5;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.dhirajbodake.Sa-mwaadUITests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = "Sāmwaad";
+			};
+			name = Debug;
+		};
+		404825812FE172740064219F /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = PUMDFHHYD3;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.5;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.dhirajbodake.Sa-mwaadUITests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = "Sāmwaad";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -454,6 +573,15 @@
 			buildConfigurations = (
 				02AE995F2ED5711D0079EA2B /* Debug */,
 				02AE99602ED5711D0079EA2B /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		404825822FE172740064219F /* Build configuration list for PBXNativeTarget "SāmwaadUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				404825802FE172740064219F /* Debug */,
+				404825812FE172740064219F /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

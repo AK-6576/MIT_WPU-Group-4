@@ -99,7 +99,9 @@ class WelcomeViewController: UIViewController, UITextFieldDelegate {
 
     // MARK: - Actions
     @IBAction func appleSignInTapped(_ sender: UIButton) {
-        // Handle Apple Sign In
+        let alert = UIAlertController(title: "Not Available", message: "Apple Sign-In is currently under development. Please use Google Sign-In or Email.", preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "OK", style: .default))
+        present(alert, animated: true)
     }
 
     @IBAction func googleSignInTapped(_ sender: UIButton) {
@@ -516,8 +518,9 @@ class WelcomeViewController: UIViewController, UITextFieldDelegate {
                                                         window.makeKeyAndVisible()
                                                         UIView.transition(with: window, duration: 0.3, options: .transitionCrossDissolve, animations: nil, completion: nil)
                                                     } else {
-                                                        // Fallback to segue if window lookup fails
-                                                        self?.performSegue(withIdentifier: "loginToHome", sender: self)
+                                                        // Fallback to modal presentation if window lookup fails
+                                                        homeNav.modalPresentationStyle = .fullScreen
+                                                        self?.present(homeNav, animated: true, completion: nil)
                                                     }
                                                 }
                                             }

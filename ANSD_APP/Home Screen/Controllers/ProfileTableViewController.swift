@@ -55,6 +55,8 @@ class ProfileTableViewController: UITableViewController, UIImagePickerController
         if firstNameTextField.text?.isEmpty ?? true {
             firstNameTextField.text = incomingName ?? "User"
         }
+        
+        datePicker.maximumDate = Date()
 
         // Load Image
         if let data = UserDefaults.standard.data(forKey: imageKey),

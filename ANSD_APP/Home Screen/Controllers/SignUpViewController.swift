@@ -151,6 +151,7 @@ class SignUpViewController: UIViewController, UITableViewDelegate, UITableViewDa
             // If you placed a UIDatePicker in this cell in Storyboard,
             // find it by tag (e.g., Tag 200) to save the value
             if let picker = cell.viewWithTag(200) as? UIDatePicker {
+                picker.maximumDate = Date()
                 picker.addTarget(self, action: #selector(datePickerChanged(_:)), for: .valueChanged)
             }
             return cell

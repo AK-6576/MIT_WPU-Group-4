@@ -61,6 +61,7 @@ class SignUpTableViewCell: UITableViewCell, UITextFieldDelegate {
     private func setupDatePicker() {
         datePicker.datePickerMode = .date
         datePicker.preferredDatePickerStyle = .wheels
+        datePicker.maximumDate = Date()
         datePicker.addTarget(self, action: #selector(dateChanged), for: .valueChanged)
 
         let toolbar = UIToolbar()
