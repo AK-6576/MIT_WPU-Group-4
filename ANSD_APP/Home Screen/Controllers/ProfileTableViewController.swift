@@ -303,14 +303,20 @@ class ProfileTableViewController: UITableViewController, UIImagePickerController
         view.endEditing(true)
     }
 
-    // MARK: - Sign Out
-    @objc    private func confirmSignOut() {
-        let actionSheet = UIAlertController(title: "Log Out", message: "Are you sure you want to log out?", preferredStyle: .actionSheet)
+    // MARK: - Sign Out & Account Deletion
+    @objc private func confirmSignOut() {
+        let actionSheet = UIAlertController(title: "Log Out", message: "Are you sure you want to log out of Sāmwaad?", preferredStyle: .actionSheet)
 
         actionSheet.addAction(UIAlertAction(title: "Log Out", style: .destructive) { [weak self] _ in
             self?.performSignOut()
         })
         actionSheet.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+
+        // iPad Popover support
+        if let popover = actionSheet.popoverPresentationController, let footerView = tableView.tableFooterView {
+            popover.sourceView = footerView
+            popover.sourceRect = footerView.bounds
+        }
 
         present(actionSheet, animated: true)
     }
@@ -320,21 +326,7 @@ class ProfileTableViewController: UITableViewController, UIImagePickerController
             DispatchQueue.main.async {
                 switch result {
                 case .success:
-                    // Route to Login Screen by resetting the window root
-                    let storyboard = UIStoryboard(name: "Onboarding", bundle: nil)
-                    if let loginNav = storyboard.instantiateInitialViewController() {
-                        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-                           let window = windowScene.windows.first {
-                            window.rootViewController = loginNav
-                            window.makeKeyAndVisible()
-                            // Add a cross-dissolve animation for a smoother feel
-                            UIView.transition(with: window, duration: 0.3, options: .transitionCrossDissolve, animations: nil, completion: nil)
-                        } else {
-                            // Fallback if window lookup fails
-                            loginNav.modalPresentationStyle = .fullScreen
-                            self?.present(loginNav, animated: true, completion: nil)
-                        }
-                    }
+                    self?.navigateToOnboarding()
                 case .failure(let error):
                     let errorAlert = UIAlertController(title: "Error", message: error.localizedDescription, preferredStyle: .alert)
                     errorAlert.addAction(UIAlertAction(title: "OK", style: .default))
@@ -344,27 +336,126 @@ class ProfileTableViewController: UITableViewController, UIImagePickerController
         }
     }
 
+    @objc private func confirmDeleteAccount() {
+        let alert = UIAlertController(
+            title: "Delete Account",
+            message: "Are you sure you want to permanently delete your account? All your voice profiles, saved conversations, and cloud data will be permanently wiped. This action cannot be undone.",
+            preferredStyle: .actionSheet
+        )
+
+        alert.addAction(UIAlertAction(title: "Delete Account & Data", style: .destructive) { [weak self] _ in
+            self?.performAccountDeletion()
+        })
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+
+        // iPad Popover support
+        if let popover = alert.popoverPresentationController, let footerView = tableView.tableFooterView {
+            popover.sourceView = footerView
+            popover.sourceRect = footerView.bounds
+        }
+
+        present(alert, animated: true)
+    }
+
+    private func performAccountDeletion() {
+        guard let currentUser = Auth.auth().currentUser else {
+            let alert = UIAlertController(title: "Error", message: "No active user session found.", preferredStyle: .alert)
+            alert.addAction(UIAlertAction(title: "OK", style: .default))
+            present(alert, animated: true)
+            return
+        }
+
+        let uid = currentUser.uid
+
+        // 1. Wipe local SwiftData voice calibration profile
+        VoiceProfileManager.shared.deleteVoiceProfile(byUID: uid)
+
+        // 2. Wipe local SwiftData conversations
+        DataManager.shared.deleteAllConversations(forUID: uid)
+
+        // 3. Clear user profile preferences from UserDefaults
+        ProfileManager.shared.resetProfile()
+
+        // 4. Delete user node from Firebase Realtime Database & Firebase Auth
+        FirebaseManager.shared.deleteAccount { [weak self] result in
+            DispatchQueue.main.async {
+                switch result {
+                case .success:
+                    print("ProfileTableViewController: Account successfully deleted.")
+                    self?.navigateToOnboarding()
+                case .failure(let error):
+                    let nsError = error as NSError
+                    let errorMessage: String
+                    if nsError.domain == "FIRAuthErrorDomain", nsError.code == 17014 { // Requires recent login
+                        errorMessage = "For security reasons, deleting your account requires a recent sign-in. Please log in again and then retry deleting your account."
+                    } else {
+                        errorMessage = error.localizedDescription
+                    }
+                    let errorAlert = UIAlertController(title: "Account Deletion Failed", message: errorMessage, preferredStyle: .alert)
+                    errorAlert.addAction(UIAlertAction(title: "OK", style: .default))
+                    self?.present(errorAlert, animated: true)
+                }
+            }
+        }
+    }
+
+    private func navigateToOnboarding() {
+        let storyboard = UIStoryboard(name: "Onboarding", bundle: nil)
+        if let loginNav = storyboard.instantiateInitialViewController() {
+            if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+               let window = windowScene.windows.first {
+                window.rootViewController = loginNav
+                window.makeKeyAndVisible()
+                UIView.transition(with: window, duration: 0.3, options: .transitionCrossDissolve, animations: nil, completion: nil)
+            } else {
+                loginNav.modalPresentationStyle = .fullScreen
+                present(loginNav, animated: true, completion: nil)
+            }
+        }
+    }
+
     // MARK: - Footer Setup
     private func setupFooterView() {
-        let footerView = UIView(frame: CGRect(x: 0, y: 0, width: tableView.bounds.width, height: 100))
+        let footerView = UIView(frame: CGRect(x: 0, y: 0, width: tableView.bounds.width, height: 140))
 
-        var config = UIButton.Configuration.filled()
-        config.title = "Log Out"
-        config.baseBackgroundColor = .systemGray5
-        config.baseForegroundColor = .systemRed
-        config.cornerStyle = .large
+        let stackView = UIStackView()
+        stackView.axis = .vertical
+        stackView.spacing = 12
+        stackView.alignment = .center
+        stackView.distribution = .fillEqually
+        stackView.translatesAutoresizingMaskIntoConstraints = false
 
-        let logoutButton = UIButton(configuration: config)
+        // 1. Log Out Button
+        var logoutConfig = UIButton.Configuration.filled()
+        logoutConfig.title = "Log Out"
+        logoutConfig.baseBackgroundColor = .systemGray5
+        logoutConfig.baseForegroundColor = .label
+        logoutConfig.cornerStyle = .large
+
+        let logoutButton = UIButton(configuration: logoutConfig)
         logoutButton.translatesAutoresizingMaskIntoConstraints = false
         logoutButton.addTarget(self, action: #selector(logoutButtonTapped), for: .touchUpInside)
 
-        footerView.addSubview(logoutButton)
+        // 2. Delete Account Button (Apple Guideline 5.1.1(v))
+        var deleteConfig = UIButton.Configuration.plain()
+        deleteConfig.title = "Delete Account"
+        deleteConfig.baseForegroundColor = .systemRed
+
+        let deleteButton = UIButton(configuration: deleteConfig)
+        deleteButton.translatesAutoresizingMaskIntoConstraints = false
+        deleteButton.addTarget(self, action: #selector(deleteAccountButtonTapped), for: .touchUpInside)
+
+        stackView.addArrangedSubview(logoutButton)
+        stackView.addArrangedSubview(deleteButton)
+        footerView.addSubview(stackView)
 
         NSLayoutConstraint.activate([
-            logoutButton.centerXAnchor.constraint(equalTo: footerView.centerXAnchor),
-            logoutButton.centerYAnchor.constraint(equalTo: footerView.centerYAnchor),
+            stackView.centerXAnchor.constraint(equalTo: footerView.centerXAnchor),
+            stackView.centerYAnchor.constraint(equalTo: footerView.centerYAnchor),
             logoutButton.widthAnchor.constraint(equalToConstant: 240),
-            logoutButton.heightAnchor.constraint(equalToConstant: 50)
+            logoutButton.heightAnchor.constraint(equalToConstant: 46),
+            deleteButton.widthAnchor.constraint(equalToConstant: 240),
+            deleteButton.heightAnchor.constraint(equalToConstant: 36)
         ])
 
         tableView.tableFooterView = footerView
@@ -372,6 +463,10 @@ class ProfileTableViewController: UITableViewController, UIImagePickerController
 
     @objc private func logoutButtonTapped() {
         confirmSignOut()
+    }
+
+    @objc private func deleteAccountButtonTapped() {
+        confirmDeleteAccount()
     }
 
     // MARK: - Custom Header Styling

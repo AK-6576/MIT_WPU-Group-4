@@ -165,4 +165,15 @@ class DataManager {
         }
     }
 
+    // 7. DELETE ALL FOR USER: Clears all SwiftData conversations belonging to a UID
+    func deleteAllConversations(forUID uid: String) {
+        guard let context = context else { return }
+        let descriptor = FetchDescriptor<Conversation>(predicate: #Predicate { $0.ownerUID == uid })
+        if let conversations = try? context.fetch(descriptor) {
+            for convo in conversations {
+                context.delete(convo)
+            }
+            saveData()
+        }
+    }
 }

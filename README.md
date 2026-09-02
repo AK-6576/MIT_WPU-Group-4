@@ -294,9 +294,13 @@ The diarization pipeline:
 
 ---
 
-## 📄 License
+## 📄 License & Legal
 
 This project is developed for academic purposes at **MIT-WPU**. All rights reserved © 2025 MIT-WPU Group 4.
+
+- 🔒 **Privacy Policy:** [PRIVACY.md](PRIVACY.md)
+- 💬 **Support & Help:** [SUPPORT.md](SUPPORT.md)
+- 📧 **Contact Email:** support.samwaad@gmail.com
 
 ---
 

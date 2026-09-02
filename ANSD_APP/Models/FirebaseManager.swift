@@ -866,26 +866,57 @@ class FirebaseManager {
             completion(.failure(signOutError))
         }
     }
+    
+    // MARK: - Account Deletion (Apple App Store Review Guideline 5.1.1(v))
+    func deleteAccount(completion: @escaping (Result<Void, Error>) -> Void) {
+        guard let user = Auth.auth().currentUser else {
+            completion(.failure(NSError(domain: "FirebaseManager", code: 401, userInfo: [NSLocalizedDescriptionKey: "No active authenticated user session found."])))
+            return
+        }
+        
+        let uid = user.uid
+        
+        // 1. Remove cloud user data from Firebase Realtime Database under /users/{uid}
+        databaseRef.child("users").child(uid).removeValue { [weak self] error, _ in
+            if let error = error {
+                print("FirebaseManager: Failed to remove cloud database node - \(error.localizedDescription)")
+            }
+            
+            // 2. Delete the user authentication record from Firebase Auth
+            user.delete { authError in
+                if let authError = authError {
+                    print("FirebaseManager: Failed to delete user from Firebase Auth - \(authError.localizedDescription)")
+                    completion(.failure(authError))
+                } else {
+                    print("FirebaseManager: Successfully deleted user account and cloud data.")
+                    completion(.success(()))
+                }
+            }
+        }
+    }
 }
+
+import Security
 
 // MARK: - CryptoHelper for Client-Side Encryption (CSE)
 struct CryptoHelper {
     
-    /// Returns the shared symmetric key.
-    /// It attempts to read the key from a `.env` file in the app bundle.
+    private static let keychainService = "com.group4.Samwaad.security"
+    private static let keychainAccount = "CSE_SymmetricKey"
+    
+    /// Returns the shared symmetric key from .env, Keychain, or generates a secure random 256-bit key.
     private static let sharedKey: SymmetricKey = {
-        let defaultKey = "f8a73b2a0c6495123d4e9f78ad5b22b10a9c8f6e7d4a3b2c1f9e8d7a6b5c4d3e"
-        var keyString = defaultKey
-        
-        // Attempt to read from .env file
+        // 1. Attempt to read from .env file if present
         if let path = Bundle.main.path(forResource: ".env", ofType: nil) ?? Bundle.main.path(forResource: "env", ofType: "txt") {
             do {
                 let content = try String(contentsOfFile: path, encoding: .utf8)
                 for line in content.components(separatedBy: .newlines) {
                     let parts = line.split(separator: "=", maxSplits: 1).map(String.init)
                     if parts.count == 2, parts[0].trimmingCharacters(in: .whitespaces) == "SYMMETRIC_KEY" {
-                        keyString = parts[1].trimmingCharacters(in: .whitespacesAndNewlines).replacingOccurrences(of: "\"", with: "")
-                        break
+                        let keyString = parts[1].trimmingCharacters(in: .whitespacesAndNewlines).replacingOccurrences(of: "\"", with: "")
+                        if let keyData = Data(hexString: keyString), keyData.count == 32 {
+                            return SymmetricKey(data: keyData)
+                        }
                     }
                 }
             } catch {
@@ -893,9 +924,49 @@ struct CryptoHelper {
             }
         }
         
-        let keyData = Data(hexString: keyString)!
-        return SymmetricKey(data: keyData)
+        // 2. Attempt to retrieve existing key from iOS Keychain
+        if let existingKeyData = loadKeyFromKeychain() {
+            return SymmetricKey(data: existingKeyData)
+        }
+        
+        // 3. Generate a new cryptographically secure 256-bit random key and save to Keychain
+        let newKey = SymmetricKey(size: .bits256)
+        let newKeyData = newKey.withUnsafeBytes { Data($0) }
+        saveKeyToKeychain(newKeyData)
+        return newKey
     }()
+    
+    // MARK: - Keychain Helpers
+    
+    private static func loadKeyFromKeychain() -> Data? {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: keychainService,
+            kSecAttrAccount as String: keychainAccount,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne
+        ]
+        
+        var dataTypeRef: AnyObject?
+        let status = SecItemCopyMatching(query as CFDictionary, &dataTypeRef)
+        if status == errSecSuccess, let data = dataTypeRef as? Data, data.count == 32 {
+            return data
+        }
+        return nil
+    }
+    
+    private static func saveKeyToKeychain(_ keyData: Data) {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: keychainService,
+            kSecAttrAccount as String: keychainAccount,
+            kSecValueData as String: keyData,
+            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+        ]
+        
+        SecItemDelete(query as CFDictionary)
+        SecItemAdd(query as CFDictionary, nil)
+    }
     
     // MARK: - Encryption & Decryption
     

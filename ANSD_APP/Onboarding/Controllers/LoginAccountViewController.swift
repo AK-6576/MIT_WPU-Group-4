@@ -240,20 +240,24 @@ class LoginViewController: UIViewController, UITextFieldDelegate {
                                             }
 
                                             DispatchQueue.main.async {
-                                                // Navigate to Home by resetting the window root for a clean state
-                                                let storyboard = UIStoryboard(name: "Home", bundle: nil)
-                                                if let homeNav = storyboard.instantiateViewController(withIdentifier: "HomeNav") as? UINavigationController {
-                                                    if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-                                                       let window = windowScene.windows.first {
-                                                        window.rootViewController = homeNav
-                                                        window.makeKeyAndVisible()
-                                                        UIView.transition(with: window, duration: 0.3, options: .transitionCrossDissolve, animations: nil, completion: nil)
-                                                    } else {
-                                                        // Fallback to segue if window lookup fails
-                                                        self?.performSegue(withIdentifier: "loginToHome", sender: self)
-                                                    }
-                                                }
-                                            }
+                                                 // Mark onboarding tips as already shown for existing user logins
+                                                 UserDefaults.standard.set(true, forKey: "home_tips_shown_v1")
+                                                 UserDefaults.standard.set(false, forKey: "is_brand_new_signup")
+
+                                                 // Navigate to Home by resetting the window root for a clean state
+                                                 let storyboard = UIStoryboard(name: "Home", bundle: nil)
+                                                 if let homeNav = storyboard.instantiateViewController(withIdentifier: "HomeNav") as? UINavigationController {
+                                                     if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+                                                        let window = windowScene.windows.first {
+                                                         window.rootViewController = homeNav
+                                                         window.makeKeyAndVisible()
+                                                         UIView.transition(with: window, duration: 0.3, options: .transitionCrossDissolve, animations: nil, completion: nil)
+                                                     } else {
+                                                         // Fallback to segue if window lookup fails
+                                                         self?.performSegue(withIdentifier: "loginToHome", sender: self)
+                                                     }
+                                                 }
+                                             }
                                         }
                                     }
                                 }

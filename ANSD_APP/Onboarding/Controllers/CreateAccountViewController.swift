@@ -204,6 +204,8 @@ class CreateAccountViewController: UIViewController, UITextFieldDelegate {
                     // Store user names locally for profile display
                     UserDefaults.standard.set(firstName, forKey: "user_first_name")
                     UserDefaults.standard.set(lastName, forKey: "user_last_name")
+                    UserDefaults.standard.set(true, forKey: "is_brand_new_signup")
+                    UserDefaults.standard.set(false, forKey: "home_tips_shown_v1")
                     self.performSegue(withIdentifier: "showCalibration", sender: self)
 
                 case .failure(let error):

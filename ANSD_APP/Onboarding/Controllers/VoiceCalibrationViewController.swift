@@ -685,10 +685,13 @@ class VoiceCalibrationViewController: UIViewController {
     // MARK: - Navigation
 
     private func navigateToHome() {
-        // Signal HomeViewController to show the onboarding tip tour on first launch
-        UserDefaults.standard.set(false, forKey: "home_tips_shown_v1")
+        // If presented modally (from Profile or Quick Captions), dismiss cleanly
+        if let presenting = presentingViewController ?? navigationController?.presentingViewController {
+            dismiss(animated: true)
+            return
+        }
 
-        // Navigate to Home by resetting the window root for a clean state
+        // Navigate to Home for onboarding flow by resetting the window root for a clean state
         let storyboard = UIStoryboard(name: "Home", bundle: nil)
         if let homeNav = storyboard.instantiateViewController(withIdentifier: "HomeNav") as? UINavigationController {
             if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,

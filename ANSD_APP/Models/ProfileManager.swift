@@ -56,7 +56,19 @@ class ProfileManager {
             if let data = newValue?.jpegData(compressionQuality: 0.8) {
                 UserDefaults.standard.set(data, forKey: imageKey)
                 NotificationCenter.default.post(name: NSNotification.Name("ProfileImageUpdated"), object: newValue)
+            } else {
+                UserDefaults.standard.removeObject(forKey: imageKey)
+                NotificationCenter.default.post(name: NSNotification.Name("ProfileImageUpdated"), object: nil)
             }
         }
+    }
+
+    /// Clears all local user profile preferences upon account deletion
+    func resetProfile() {
+        UserDefaults.standard.removeObject(forKey: firstNameKey)
+        UserDefaults.standard.removeObject(forKey: lastNameKey)
+        UserDefaults.standard.removeObject(forKey: genderKey)
+        UserDefaults.standard.removeObject(forKey: dobKey)
+        UserDefaults.standard.removeObject(forKey: imageKey)
     }
 }

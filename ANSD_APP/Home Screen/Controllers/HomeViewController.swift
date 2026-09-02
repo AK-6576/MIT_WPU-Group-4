@@ -61,8 +61,10 @@ class HomeViewController: UIViewController {
         NotificationCenter.default.addObserver(self, selector: #selector(triggerWalkthrough), name: NSNotification.Name("ReplayHomeTips"), object: nil)
     }
 
+    private var isTourCancelled = false
+
     @objc private func triggerWalkthrough() {
-        presentHomeTipsIfNeeded()
+        presentHomeTipsIfNeeded(force: true)
     }
 
     override func viewDidAppear(_ animated: Bool) {
@@ -239,65 +241,76 @@ class HomeViewController: UIViewController {
         }
     }
 
-    /// Presents the ordered tip sequence only on the user's first session after account creation.
-    private func presentHomeTipsIfNeeded() {
-        // 1. If the key doesn't exist, check if the user is already authenticated.
-        // If they are, they are an existing user (e.g. re-install or update).
-        if UserDefaults.standard.object(forKey: Self.tipsShownKey) == nil {
-            if Auth.auth().currentUser != nil {
+    /// Presents the ordered tip sequence only on the user's first session after account creation, or when replayed from Settings.
+    private func presentHomeTipsIfNeeded(force: Bool = false) {
+        if !force {
+            // 1. If already shown and completed, never show again
+            if UserDefaults.standard.bool(forKey: Self.tipsShownKey) {
+                return
+            }
+
+            // 2. Only show if explicitly flagged as brand-new signup
+            let isBrandNewSignup = UserDefaults.standard.bool(forKey: "is_brand_new_signup")
+            guard isBrandNewSignup else {
                 UserDefaults.standard.set(true, forKey: Self.tipsShownKey)
                 return
             }
         }
 
-        // 2. Only show if explicitly set to false (by VoiceCalibration flow or Replay trigger)
-        guard UserDefaults.standard.bool(forKey: Self.tipsShownKey) == false else { return }
-
-        // 3. Mark as shown immediately to prevent double-firing
+        // Mark as completed immediately so it never runs automatically again
         UserDefaults.standard.set(true, forKey: Self.tipsShownKey)
+        UserDefaults.standard.set(false, forKey: "is_brand_new_signup")
+        isTourCancelled = false
 
         // Present tips as a sequenced walk-through
         Task { @MainActor in
+            guard !isTourCancelled else { return }
+
             // Step 1: Profile
             if let barItem = navigationItem.rightBarButtonItem, let anchorView = barItem.customView {
                 let continued = await presentTipStep(profileTip, source: anchorView, tint: .systemIndigo)
-                if !continued { return }
+                if !continued || isTourCancelled { return }
             }
 
             try? await Task.sleep(for: .seconds(0.5))
+            guard !isTourCancelled else { return }
 
             // Step 2: Quick Captioning
             if let headerView = tableView.tableHeaderView as? GreetingViewCell,
                let quickView = headerView.quickConvoView {
                 let continued = await presentTipStep(quickCaptionTip, source: quickView, tint: .systemBlue, duration: 4.0)
-                if !continued { return }
+                if !continued || isTourCancelled { return }
             }
 
             try? await Task.sleep(for: .seconds(0.5))
+            guard !isTourCancelled else { return }
 
             // Step 3: New Conversation
             if let headerView = tableView.tableHeaderView as? GreetingViewCell,
                let newView = headerView.newConvoView {
                 let continued = await presentTipStep(newConvoTip, source: newView, tint: .systemBlue)
-                if !continued { return }
+                if !continued || isTourCancelled { return }
             }
 
             try? await Task.sleep(for: .seconds(0.5))
+            guard !isTourCancelled else { return }
 
             // Step 4: Join Conversation
             if let headerView = tableView.tableHeaderView as? GreetingViewCell,
                let joinView = headerView.joinConvoView {
                 let continued = await presentTipStep(joinConvoTip, source: joinView, tint: .systemIndigo)
-                if !continued { return }
+                if !continued || isTourCancelled { return }
             }
 
             try? await Task.sleep(for: .seconds(0.5))
+            guard !isTourCancelled else { return }
 
             // Step 5: Quick Actions
             let continuedQA = await presentTipStep(quickActionsTip, source: tableView, tint: .systemOrange, isHeader: true, section: 0)
-            if !continuedQA { return }
+            if !continuedQA || isTourCancelled { return }
 
             try? await Task.sleep(for: .seconds(0.5))
+            guard !isTourCancelled else { return }
 
             // Step 6: History
             _ = await presentTipStep(viewConvosTip, source: tableView, tint: .systemTeal, isHeader: true, section: 1)
@@ -307,6 +320,8 @@ class HomeViewController: UIViewController {
     /// Helper to present a tip and wait for either a timeout or manual dismissal.
     /// Returns true if the tour should continue, false if the user dismissed it.
     private func presentTipStep(_ tip: any Tip, source: Any, tint: UIColor, duration: Double = 3.5, isHeader: Bool = false, section: Int = 0) async -> Bool {
+        guard !isTourCancelled else { return false }
+
         let popover: TipUIPopoverViewController
 
         if let view = source as? UIView {
@@ -317,10 +332,12 @@ class HomeViewController: UIViewController {
         } else if let item = source as? UIBarButtonItem {
             popover = TipUIPopoverViewController(tip, sourceItem: item)
         } else {
-            return true
+            return false
         }
 
         popover.view.tintColor = tint
+
+        var userDismissedEarly = false
 
         // Present and wait
         await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
@@ -335,23 +352,34 @@ class HomeViewController: UIViewController {
             try? await Task.sleep(for: .milliseconds(100))
             // If user tapped 'X' or outside, the popover will be dismissed
             if popover.isBeingDismissed || popover.presentingViewController == nil {
-                return true // User dismissed this tip, proceed to the next one
+                userDismissedEarly = true
+                break
             }
         }
 
-        // Dismiss automatically if still showing
-        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-            popover.dismiss(animated: true) {
-                continuation.resume()
+        if userDismissedEarly {
+            // User explicitly dismissed this tip -> Halt the entire tour immediately
+            isTourCancelled = true
+            tip.invalidate(reason: .tipClosed)
+            return false
+        }
+
+        // Dismiss automatically if still showing after duration
+        if !popover.isBeingDismissed && popover.presentingViewController != nil {
+            await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+                popover.dismiss(animated: true) {
+                    continuation.resume()
+                }
             }
         }
 
-        return true
+        return !isTourCancelled
     }
 
     // MARK: - (Debug / QA) Reset Tips — call from Settings screen to replay the tip tour
     static func resetTips() {
         UserDefaults.standard.set(false, forKey: tipsShownKey)
+        UserDefaults.standard.set(true, forKey: "is_brand_new_signup")
         try? Tips.resetDatastore()
     }
 
